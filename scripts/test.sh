@@ -25,5 +25,5 @@ function test_swift() {
 }
 
 shellcheck scripts/*.sh
-uv run python -m pytest
+uv run pytest
 test_swift

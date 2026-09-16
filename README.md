@@ -8,7 +8,7 @@ Requires macOS 14+, Swift 6.1+ (Xcode Command Line Tools), and uv with Python 3.
 Download both dictionaries in Dictionary.app’s settings, then run:
 
 ```console
-uv run scripts/dictionaries.py import
+uv run audibledict/dictionaries/cli.py import
 bash scripts/build.sh
 ```
 
@@ -27,8 +27,8 @@ controls example playback. Press **⌘.** to stop.
 Export synthesis jobs:
 
 ```console
-uv run scripts/dictionaries.py export --accent us --output exports/examples-us.jsonl
-uv run scripts/dictionaries.py export --kind headwords --accent us --output exports/headwords-us.jsonl
+uv run audibledict/dictionaries/cli.py export --accent us --output exports/examples-us.jsonl
+uv run audibledict/dictionaries/cli.py export --kind headwords --accent us --output exports/headwords-us.jsonl
 ```
 
 Use `--accent uk` for British English. Add `--fallback` for fallback recordings.
@@ -49,4 +49,4 @@ audio/fallback/<dict>/<accent>/<id>.mp4
 folder first, then the fallback folder. Missing audio disables playback.
 Click **Refresh audio** after copying files. Move the `audio/` folder with the app.
 
-Run `uv run scripts/dictionaries.py export --help` for all export options.
+Run `uv run audibledict/dictionaries/cli.py export --help` for all export options.

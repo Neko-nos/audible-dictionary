@@ -8,13 +8,10 @@ import xml.etree.ElementTree as ET
 import zlib
 from pathlib import Path
 
-from scripts.dictionaries import (
-    discover,
-    entries,
-    export_audio,
-    import_library,
-    parse_entry,
-)
+from audibledict.dictionaries.bundles import discover, entries
+from audibledict.dictionaries.export import export_audio
+from audibledict.dictionaries.library import import_library
+from audibledict.dictionaries.parser import parse_entry
 
 
 def dummy_entry(source_id: str = "WDEJ_dummy", title: str = "lumifern") -> bytes:
