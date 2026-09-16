@@ -61,10 +61,14 @@ private struct DictionaryView: View {
       }
       Divider()
       HStack {
-        Image(systemName: audio.isPlaying ? "waveform" : "speaker.wave.2")
+        if audio.isGenerating {
+          ProgressView().controlSize(.small)
+        } else {
+          Image(systemName: audio.isPlaying ? "waveform" : "speaker.wave.2")
+        }
         Text(audio.status).lineLimit(2)
         Spacer()
-        Button("Stop", action: audio.stop).disabled(!audio.isPlaying)
+        Button("Stop", action: audio.stop).disabled(!audio.isPlaying && !audio.isGenerating)
       }.font(.caption).padding(.horizontal, 16).padding(.vertical, 9)
     }
     .tint(Color(red: 0.13, green: 0.43, blue: 0.33))
@@ -73,6 +77,10 @@ private struct DictionaryView: View {
       await model.search()
     }
     .task(id: model.selection) { await model.select() }
+    .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) {
+      _ in
+      audio.stop()
+    }
     .defaultFocus($searchFocused, true)
   }
 
@@ -126,20 +134,13 @@ private struct DictionaryView: View {
           }
           HStack(spacing: 8) {
             ForEach(Accent.allCases) { accent in
-              let local =
-                AudioFiles.local(
-                  id: entry.summary.audioID, source: entry.summary.source, accent: accent,
-                  folder: audioFolder)
-                != nil
               Button {
                 audio.play(
                   id: entry.summary.audioID, source: entry.summary.source, accent: accent,
-                  folder: audioFolder)
+                  folder: audioFolder, text: entry.summary.headword)
               } label: {
-                Label(
-                  "\(accent.label) · \(local ? "Imported audio" : "No audio")",
-                  systemImage: "speaker.wave.2")
-              }.controlSize(.small).disabled(!local)
+                Label(accent.label, systemImage: "speaker.wave.2")
+              }.controlSize(.small)
             }
             Spacer()
           }

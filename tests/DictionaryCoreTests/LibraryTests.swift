@@ -32,6 +32,7 @@ struct LibraryTests {
     let entry = try await library.entry("a")
     #expect(entry?.html == "<p>Invented plant</p>")
     #expect(entry?.examples.first?.id == "example_a")
+    #expect(entry?.examples.first?.text == "The lumifern glows softly.")
     #expect(entry?.examples.first?.needsReview == false)
     let reference = try await library.reference("dummy_a", source: "ODE")
     #expect(reference?.id == "a")
@@ -42,13 +43,13 @@ struct LibraryTests {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(
       at: folder.appendingPathComponent("fallback/\(directory)"), withIntermediateDirectories: true)
-    let fallback = folder.appendingPathComponent("fallback/\(directory)/dummy.mp4")
+    let fallback = folder.appendingPathComponent("fallback/\(directory)/dummy.caf")
     try Data().write(to: fallback)
     #expect(
       AudioFiles.local(id: "dummy", source: "ODE", accent: accent, folder: folder) == fallback)
     try FileManager.default.createDirectory(
       at: folder.appendingPathComponent(directory), withIntermediateDirectories: true)
-    let file = folder.appendingPathComponent("\(directory)/dummy.mp4")
+    let file = folder.appendingPathComponent("\(directory)/dummy.caf")
     try Data().write(to: file)
     #expect(AudioFiles.local(id: "dummy", source: "ODE", accent: accent, folder: folder) == file)
     if let accent {

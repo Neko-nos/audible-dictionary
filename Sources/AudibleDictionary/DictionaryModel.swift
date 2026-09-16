@@ -104,6 +104,7 @@ final class DictionaryModel: ObservableObject {
     guard let entry, let example = entry.examples.first(where: { $0.id == id }) else {
       return
     }
-    audio.play(id: example.id, source: entry.summary.source, folder: audioFolder)
+    audio.play(
+      id: example.id, source: entry.summary.source, folder: audioFolder, text: example.text)
   }
 }

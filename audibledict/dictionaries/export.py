@@ -51,7 +51,7 @@ def export_audio(
                     directory += f"/{voice_accent}"
                     job["accent"] = voice_accent
                     job["language"] = "en-US" if voice_accent == "us" else "en-GB"
-                job["audio_path"] = f"{directory}/{job['id']}.mp4"
+                job["audio_path"] = f"{directory}/{job['id']}.caf"
                 stream.write(json.dumps(job, ensure_ascii=False) + "\n")
                 count += 1
     db.close()

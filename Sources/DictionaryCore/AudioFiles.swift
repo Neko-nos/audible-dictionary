@@ -11,7 +11,7 @@ public enum AudioFiles {
     for root in [folder, folder.appendingPathComponent("fallback")] {
       var directory = root.appendingPathComponent(source)
       if let accent { directory.appendPathComponent(accent.rawValue) }
-      let url = directory.appendingPathComponent(id).appendingPathExtension("mp4")
+      let url = directory.appendingPathComponent(id).appendingPathExtension("caf")
       if FileManager.default.fileExists(atPath: url.path) { return url }
     }
     return nil

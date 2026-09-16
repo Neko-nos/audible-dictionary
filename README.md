@@ -4,7 +4,8 @@ Look up English words in **WISDOM English–Japanese** and **Oxford Dictionary o
 
 ## Setup
 
-Requires macOS 14+, Swift 6.1+ (Xcode Command Line Tools), and uv with Python 3.10+.
+Requires an Apple Silicon Mac with macOS 14+, Swift 6.1+ (Xcode Command Line Tools),
+and uv with Python 3.12.
 Download both dictionaries in Dictionary.app’s settings, then run:
 
 ```console
@@ -19,8 +20,8 @@ To update the library, rerun the import and reopen it in the app.
 ## Search
 
 Type a word or prefix and select a result. Filter by **All**, **WISDOM**, or **ODE**.
-Click **US/UK** for headword audio or an example’s audio button for English speech.
-Press **⌘.** to stop.
+Click **US/UK** for headword audio or click an English example to hear it.
+Press **⌘.** to stop playback or cancel speech generation.
 
 ## Prepare audio
 
@@ -35,21 +36,21 @@ Headwords include both US and UK accents; use `--accent us` or `--accent uk` to
 export just one. Examples use one English recording. Add `--fallback` for fallback recordings.
 
 Copy the JSONL files to your synthesis machine. Generate each record’s `text` and
-save AAC-encoded MP4 audio at `audio_path`, keeping its `id` unchanged. Review
+save Opus-encoded CAF audio at `audio_path`, keeping its `id` unchanged. Review
 examples marked `needs_review`; `context` and `pronunciations` help choose the wording
-and pronunciation. The app does not generate audio.
+and pronunciation. Missing headword and example recordings are generated when clicked and saved for later use.
 
 Copy the resulting `audio/` folder beside the `.app` (currently in `build/`):
 
 ```text
-audio/<dict>/<id>.mp4
-audio/fallback/<dict>/<id>.mp4
-audio/<dict>/<accent>/<id>.mp4
-audio/fallback/<dict>/<accent>/<id>.mp4
+audio/<dict>/<id>.caf
+audio/fallback/<dict>/<id>.caf
+audio/<dict>/<accent>/<id>.caf
+audio/fallback/<dict>/<accent>/<id>.caf
 ```
 
 `<dict>` is `ODE` or `WISDOM`; headwords use `<accent>` of `us` or `uk`. The app checks the main
-folder first, then the fallback folder. Missing audio disables playback.
+folder first, then the fallback folder.
 Click **Refresh audio** after copying files. Move the `audio/` folder with the app.
 
 Run `uv run audibledict/dictionaries/cli.py export --help` for all export options.

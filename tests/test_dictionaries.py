@@ -94,7 +94,7 @@ def test_binary_import_and_both_export_kinds(tmp_path: Path) -> None:
     jobs = [json.loads(line) for line in export.read_text().splitlines()]
     for job in jobs:
         assert job["language"] == "en"
-        assert job["audio_path"] == f"audio/{job['source']}/{job['id']}.mp4"
+        assert job["audio_path"] == f"audio/{job['source']}/{job['id']}.caf"
     original_ids = [job["id"] for job in jobs]
     import_library(discover([bundles]), library)
     export_audio(library, export, "examples", fallback=True)
@@ -102,7 +102,7 @@ def test_binary_import_and_both_export_kinds(tmp_path: Path) -> None:
     assert original_ids == [job["id"] for job in fallback_jobs]
     for job in fallback_jobs:
         assert job["language"] == "en"
-        assert job["audio_path"] == f"audio/fallback/{job['source']}/{job['id']}.mp4"
+        assert job["audio_path"] == f"audio/fallback/{job['source']}/{job['id']}.caf"
     assert export_audio(library, export, "headwords") == 4
     headwords = [json.loads(line) for line in export.read_text().splitlines()]
     assert {job["id"] for job in headwords[::2]} == {
@@ -114,10 +114,10 @@ def test_binary_import_and_both_export_kinds(tmp_path: Path) -> None:
         assert job["kind"] == "headwords"
         assert job["accent"] == accent
         assert job["language"] == language
-        assert job["audio_path"] == f"audio/{job['source']}/{accent}/{job['id']}.mp4"
+        assert job["audio_path"] == f"audio/{job['source']}/{accent}/{job['id']}.caf"
     assert export_audio(library, export, "headwords", "uk", fallback=True) == 2
     for line in export.read_text().splitlines():
         job = json.loads(line)
         assert job["accent"] == "uk"
         assert job["language"] == "en-GB"
-        assert job["audio_path"] == f"audio/fallback/{job['source']}/uk/{job['id']}.mp4"
+        assert job["audio_path"] == f"audio/fallback/{job['source']}/uk/{job['id']}.caf"
