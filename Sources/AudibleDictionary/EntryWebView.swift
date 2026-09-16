@@ -4,7 +4,6 @@ import WebKit
 
 struct EntryWebView: NSViewRepresentable {
   let entry: Entry
-  let accent: Accent
   let audioFolder: URL
   let play: (String) -> Void
   let follow: (String) -> Void
@@ -24,10 +23,10 @@ struct EntryWebView: NSViewRepresentable {
     context.coordinator.play = play
     context.coordinator.follow = follow
     let localIDs = entry.examples.filter {
-      AudioFiles.local(id: $0.id, source: entry.summary.source, accent: accent, folder: audioFolder)
+      AudioFiles.local(id: $0.id, source: entry.summary.source, folder: audioFolder)
         != nil
     }.map(\.id)
-    let key = entry.summary.id + accent.rawValue + audioFolder.path + localIDs.joined()
+    let key = entry.summary.id + audioFolder.path + localIDs.joined()
     if context.coordinator.key == key { return }
     context.coordinator.key = key
     let imported = String(data: try! JSONEncoder().encode(localIDs), encoding: .utf8)!
@@ -59,7 +58,7 @@ struct EntryWebView: NSViewRepresentable {
         const button = document.createElement('button');
         button.className = 'audio-button';
         button.disabled = !imported.has(id);
-        button.textContent = button.disabled ? 'No \(accent.label) audio' : '▶ Audio \(accent.label)';
+        button.textContent = button.disabled ? 'No audio' : '▶ Audio';
         button.title = (button.disabled ? 'No imported audio' : 'Play imported audio') +
           (review.has(id) ? ' · Example contains editorial alternatives' : '');
         button.setAttribute('aria-label', button.title + ': ' + example.textContent);

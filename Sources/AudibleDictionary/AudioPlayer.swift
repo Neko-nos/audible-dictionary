@@ -15,17 +15,18 @@ final class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     status = "Stopped"
   }
 
-  func play(id: String, source: String, accent: Accent, folder: URL) {
+  func play(id: String, source: String, accent: Accent? = nil, folder: URL) {
     stop()
+    let label = accent?.label ?? "English"
     guard let file = AudioFiles.local(id: id, source: source, accent: accent, folder: folder) else {
-      status = "No imported \(accent.label) audio."
+      status = "No imported \(label) audio."
       return
     }
     do {
       player = try AVAudioPlayer(contentsOf: file)
       player?.delegate = self
       isPlaying = player?.play() == true
-      status = isPlaying ? "Imported \(accent.label) audio" : "This audio file could not be played."
+      status = isPlaying ? "Imported \(label) audio" : "This audio file could not be played."
     } catch {
       status = "Audio could not be played: \(error.localizedDescription)"
     }

@@ -7,10 +7,11 @@ public enum Accent: String, CaseIterable, Identifiable, Sendable {
 }
 
 public enum AudioFiles {
-  public static func local(id: String, source: String, accent: Accent, folder: URL) -> URL? {
+  public static func local(id: String, source: String, accent: Accent? = nil, folder: URL) -> URL? {
     for root in [folder, folder.appendingPathComponent("fallback")] {
-      let url = root.appendingPathComponent(source).appendingPathComponent(accent.rawValue)
-        .appendingPathComponent(id).appendingPathExtension("mp4")
+      var directory = root.appendingPathComponent(source)
+      if let accent { directory.appendPathComponent(accent.rawValue) }
+      let url = directory.appendingPathComponent(id).appendingPathExtension("mp4")
       if FileManager.default.fileExists(atPath: url.path) { return url }
     }
     return nil

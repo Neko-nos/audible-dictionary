@@ -123,10 +123,6 @@ private struct DictionaryView: View {
               .textSelection(.enabled)
             Text(entry.summary.source).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             Spacer()
-            Picker("Example accent", selection: $model.accent) {
-              ForEach(Accent.allCases) { Text($0.label).tag($0) }
-            }.pickerStyle(.segmented).labelsHidden().frame(width: 104).help(
-              "Accent for example playback")
           }
           HStack(spacing: 8) {
             ForEach(Accent.allCases) { accent in
@@ -155,7 +151,7 @@ private struct DictionaryView: View {
         }.padding(.horizontal, 24).padding(.vertical, 18)
         Divider()
         EntryWebView(
-          entry: entry, accent: model.accent, audioFolder: audioFolder,
+          entry: entry, audioFolder: audioFolder,
           play: model.playExample, follow: model.follow)
       }
     } else {

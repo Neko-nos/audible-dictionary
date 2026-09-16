@@ -1,6 +1,6 @@
 # Audible Dictionary
 
-Look up English words in **WISDOM English–Japanese** and **Oxford Dictionary of English (ODE)**, and play imported US/UK pronunciation and example audio offline.
+Look up English words in **WISDOM English–Japanese** and **Oxford Dictionary of English (ODE)**, and play imported US/UK headword pronunciations and English example audio offline.
 
 ## Setup
 
@@ -19,19 +19,20 @@ To update the library, rerun the import and reopen it in the app.
 ## Search
 
 Type a word or prefix and select a result. Filter by **All**, **WISDOM**, or **ODE**.
-Click **US/UK** for headword audio or an example’s audio button. The accent picker
-controls example playback. Press **⌘.** to stop.
+Click **US/UK** for headword audio or an example’s audio button for English speech.
+Press **⌘.** to stop.
 
 ## Prepare audio
 
 Export synthesis jobs:
 
 ```console
-uv run audibledict/dictionaries/cli.py export --accent us --output exports/examples-us.jsonl
-uv run audibledict/dictionaries/cli.py export --kind headwords --accent us --output exports/headwords-us.jsonl
+uv run audibledict/dictionaries/cli.py export --output exports/examples.jsonl
+uv run audibledict/dictionaries/cli.py export --kind headwords --output exports/headwords.jsonl
 ```
 
-Use `--accent uk` for British English. Add `--fallback` for fallback recordings.
+Headwords include both US and UK accents; use `--accent us` or `--accent uk` to
+export just one. Examples use one English recording. Add `--fallback` for fallback recordings.
 
 Copy the JSONL files to your synthesis machine. Generate each record’s `text` and
 save AAC-encoded MP4 audio at `audio_path`, keeping its `id` unchanged. Review
@@ -41,11 +42,13 @@ and pronunciation. The app does not generate audio.
 Copy the resulting `audio/` folder beside the `.app` (currently in `build/`):
 
 ```text
+audio/<dict>/<id>.mp4
+audio/fallback/<dict>/<id>.mp4
 audio/<dict>/<accent>/<id>.mp4
 audio/fallback/<dict>/<accent>/<id>.mp4
 ```
 
-`<dict>` is `ODE` or `WISDOM`; `<accent>` is `us` or `uk`. The app checks the main
+`<dict>` is `ODE` or `WISDOM`; headwords use `<accent>` of `us` or `uk`. The app checks the main
 folder first, then the fallback folder. Missing audio disables playback.
 Click **Refresh audio** after copying files. Move the `audio/` folder with the app.
 

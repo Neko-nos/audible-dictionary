@@ -26,7 +26,11 @@ def main() -> None:
     sub.add_argument("--library", type=Path, default=Path("build/Library"))
     sub.add_argument("--output", type=Path, required=True)
     sub.add_argument("--kind", choices=("examples", "headwords"), default="examples")
-    sub.add_argument("--accent", choices=("us", "uk"), required=True)
+    sub.add_argument(
+        "--accent",
+        choices=("us", "uk"),
+        help="Headwords only; exports both accents by default",
+    )
     sub.add_argument(
         "--fallback", action="store_true", help="Use audio/fallback output paths"
     )
