@@ -2,6 +2,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+uv sync
 swift build -c release
 mkdir -p "build/Audible Dictionary.app/Contents/MacOS" "build/Audible Dictionary.app/Contents/Resources"
 ditto .build/release/AudibleDictionary "build/Audible Dictionary.app/Contents/MacOS/AudibleDictionary"
@@ -22,5 +23,9 @@ cat > "build/Audible Dictionary.app/Contents/Info.plist" <<'PLIST'
     <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
+/usr/libexec/PlistBuddy -c "Add :FallbackUV string $(command -v uv)" \
+    "build/Audible Dictionary.app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :FallbackProject string $(pwd)" \
+    "build/Audible Dictionary.app/Contents/Info.plist"
 codesign --force --sign - "build/Audible Dictionary.app"
 echo 'Built build/Audible Dictionary.app'

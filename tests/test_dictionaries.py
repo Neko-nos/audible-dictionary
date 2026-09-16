@@ -8,13 +8,10 @@ import xml.etree.ElementTree as ET
 import zlib
 from pathlib import Path
 
-from scripts.dictionaries import (
-    discover,
-    entries,
-    export_audio,
-    import_library,
-    parse_entry,
-)
+from audibledict.dictionaries.bundles import discover, entries
+from audibledict.dictionaries.export import export_audio
+from audibledict.dictionaries.library import import_library
+from audibledict.dictionaries.parser import parse_entry
 
 
 def dummy_entry(source_id: str = "WDEJ_dummy", title: str = "lumifern") -> bytes:
@@ -93,20 +90,34 @@ def test_binary_import_and_both_export_kinds(tmp_path: Path) -> None:
     with sqlite3.connect(library / "dictionary.sqlite") as db:
         assert db.execute("SELECT COUNT(*) FROM entries").fetchone()[0] == 2
     export = tmp_path / "jobs.jsonl"
-    assert export_audio(library, export, "examples", "uk") == 6
+    assert export_audio(library, export, "examples") == 6
     jobs = [json.loads(line) for line in export.read_text().splitlines()]
-    assert jobs[0]["language"] == "en-GB"
     for job in jobs:
-        assert job["audio_path"] == f"audio/{job['source']}/uk/{job['id']}.mp4"
+        assert job["language"] == "en"
+        assert job["audio_path"] == f"audio/{job['source']}/{job['id']}.caf"
     original_ids = [job["id"] for job in jobs]
     import_library(discover([bundles]), library)
-    export_audio(library, export, "examples", "us", fallback=True)
+    export_audio(library, export, "examples", fallback=True)
     fallback_jobs = [json.loads(line) for line in export.read_text().splitlines()]
     assert original_ids == [job["id"] for job in fallback_jobs]
     for job in fallback_jobs:
-        assert job["audio_path"] == f"audio/fallback/{job['source']}/us/{job['id']}.mp4"
-    assert export_audio(library, export, "headwords", "us") == 2
+        assert job["language"] == "en"
+        assert job["audio_path"] == f"audio/fallback/{job['source']}/{job['id']}.caf"
+    assert export_audio(library, export, "headwords") == 4
+    headwords = [json.loads(line) for line in export.read_text().splitlines()]
+    assert {job["id"] for job in headwords[::2]} == {
+        job["id"] for job in headwords[1::2]
+    }
+    for job, (accent, language) in zip(
+        headwords, [("us", "en-US"), ("uk", "en-GB")] * 2
+    ):
+        assert job["kind"] == "headwords"
+        assert job["accent"] == accent
+        assert job["language"] == language
+        assert job["audio_path"] == f"audio/{job['source']}/{accent}/{job['id']}.caf"
+    assert export_audio(library, export, "headwords", "uk", fallback=True) == 2
     for line in export.read_text().splitlines():
         job = json.loads(line)
-        assert job["kind"] == "headwords"
-        assert job["audio_path"] == f"audio/{job['source']}/us/{job['id']}.mp4"
+        assert job["accent"] == "uk"
+        assert job["language"] == "en-GB"
+        assert job["audio_path"] == f"audio/fallback/{job['source']}/uk/{job['id']}.caf"

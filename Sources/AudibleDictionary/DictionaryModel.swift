@@ -11,7 +11,6 @@ final class DictionaryModel: ObservableObject {
   @Published var entry: Entry?
   @Published var error: String?
   @Published private(set) var library: Library?
-  @Published var accent: Accent = .us
   let audio = AudioPlayer()
   let audioFolder = Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent(
     "audio")
@@ -105,6 +104,7 @@ final class DictionaryModel: ObservableObject {
     guard let entry, let example = entry.examples.first(where: { $0.id == id }) else {
       return
     }
-    audio.play(id: example.id, source: entry.summary.source, accent: accent, folder: audioFolder)
+    audio.play(
+      id: example.id, source: entry.summary.source, folder: audioFolder, text: example.text)
   }
 }

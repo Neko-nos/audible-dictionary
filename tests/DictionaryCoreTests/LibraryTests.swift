@@ -32,24 +32,31 @@ struct LibraryTests {
     let entry = try await library.entry("a")
     #expect(entry?.html == "<p>Invented plant</p>")
     #expect(entry?.examples.first?.id == "example_a")
+    #expect(entry?.examples.first?.text == "The lumifern glows softly.")
     #expect(entry?.examples.first?.needsReview == false)
     let reference = try await library.reference("dummy_a", source: "ODE")
     #expect(reference?.id == "a")
   }
 
-  @Test func audioFilesRespectDictionaryAccentAndPriority() throws {
+  @Test(arguments: [(nil, "ODE"), (Accent.us, "ODE/us"), (Accent.uk, "ODE/uk")])
+  func audioFilesRespectDictionaryAccentAndPriority(accent: Accent?, directory: String) throws {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(
-      at: folder.appendingPathComponent("fallback/ODE/uk"), withIntermediateDirectories: true)
-    let fallback = folder.appendingPathComponent("fallback/ODE/uk/dummy.mp4")
+      at: folder.appendingPathComponent("fallback/\(directory)"), withIntermediateDirectories: true)
+    let fallback = folder.appendingPathComponent("fallback/\(directory)/dummy.caf")
     try Data().write(to: fallback)
-    #expect(AudioFiles.local(id: "dummy", source: "ODE", accent: .uk, folder: folder) == fallback)
+    #expect(
+      AudioFiles.local(id: "dummy", source: "ODE", accent: accent, folder: folder) == fallback)
     try FileManager.default.createDirectory(
-      at: folder.appendingPathComponent("ODE/uk"), withIntermediateDirectories: true)
-    let file = folder.appendingPathComponent("ODE/uk/dummy.mp4")
+      at: folder.appendingPathComponent(directory), withIntermediateDirectories: true)
+    let file = folder.appendingPathComponent("\(directory)/dummy.caf")
     try Data().write(to: file)
-    #expect(AudioFiles.local(id: "dummy", source: "ODE", accent: .uk, folder: folder) == file)
-    #expect(AudioFiles.local(id: "dummy", source: "ODE", accent: .us, folder: folder) == nil)
-    #expect(AudioFiles.local(id: "dummy", source: "WISDOM", accent: .uk, folder: folder) == nil)
+    #expect(AudioFiles.local(id: "dummy", source: "ODE", accent: accent, folder: folder) == file)
+    if let accent {
+      #expect(
+        AudioFiles.local(
+          id: "dummy", source: "ODE", accent: accent == .us ? .uk : .us, folder: folder) == nil)
+    }
+    #expect(AudioFiles.local(id: "dummy", source: "WISDOM", accent: accent, folder: folder) == nil)
   }
 }

@@ -10,6 +10,7 @@ public struct EntrySummary: Decodable, FetchableRecord, Identifiable, Hashable, 
 
 public struct Example: Decodable, FetchableRecord, Identifiable, Sendable {
   public let id: String
+  public let text: String
   public let needsReview: Bool
 }
 
@@ -71,7 +72,7 @@ public actor Library {
             """, arguments: [id])
       else { return nil }
       let examples = try Example.fetchAll(
-        db, sql: "SELECT id,needs_review AS needsReview FROM examples WHERE entry_id=?",
+        db, sql: "SELECT id,text,needs_review AS needsReview FROM examples WHERE entry_id=?",
         arguments: [id])
       return Entry(
         summary: try EntrySummary(row: row), html: row["html"], css: row["css"],

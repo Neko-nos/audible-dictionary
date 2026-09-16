@@ -4,7 +4,6 @@ import WebKit
 
 struct EntryWebView: NSViewRepresentable {
   let entry: Entry
-  let accent: Accent
   let audioFolder: URL
   let play: (String) -> Void
   let follow: (String) -> Void
@@ -24,10 +23,10 @@ struct EntryWebView: NSViewRepresentable {
     context.coordinator.play = play
     context.coordinator.follow = follow
     let localIDs = entry.examples.filter {
-      AudioFiles.local(id: $0.id, source: entry.summary.source, accent: accent, folder: audioFolder)
+      AudioFiles.local(id: $0.id, source: entry.summary.source, folder: audioFolder)
         != nil
     }.map(\.id)
-    let key = entry.summary.id + accent.rawValue + audioFolder.path + localIDs.joined()
+    let key = entry.summary.id + audioFolder.path + localIDs.joined()
     if context.coordinator.key == key { return }
     context.coordinator.key = key
     let imported = String(data: try! JSONEncoder().encode(localIDs), encoding: .utf8)!
@@ -43,6 +42,7 @@ struct EntryWebView: NSViewRepresentable {
       body { padding: 12px 24px 48px; margin: 0; font-size: 17px; line-height: 1.6; }
       .entry > .hg, .entry > .hwg { padding-bottom: 16px; }
       .ex { background: light-dark(#f0f5f3, #263730); border-radius: 3px; }
+      [data-audio-id] { cursor: pointer; }
       .audio-button { font: 11px -apple-system; cursor: pointer; margin: 0 5px; padding: 3px 7px;
         color: light-dark(#17694d, #8bdfb3); border: 1px solid light-dark(#b9d5c6,#426653);
         border-radius: 5px; background: light-dark(#f3faf6,#23392e); vertical-align: 1px; }
@@ -58,12 +58,15 @@ struct EntryWebView: NSViewRepresentable {
         const id = example.dataset.audioId;
         const button = document.createElement('button');
         button.className = 'audio-button';
-        button.disabled = !imported.has(id);
-        button.textContent = button.disabled ? 'No \(accent.label) audio' : '▶ Audio \(accent.label)';
-        button.title = (button.disabled ? 'No imported audio' : 'Play imported audio') +
+        button.textContent = '▶ Audio';
+        button.title = (imported.has(id) ? 'Play audio' : 'Generate and play speech') +
           (review.has(id) ? ' · Example contains editorial alternatives' : '');
         button.setAttribute('aria-label', button.title + ': ' + example.textContent);
-        button.onclick = () => window.webkit.messageHandlers.play.postMessage(id);
+        const play = () => window.webkit.messageHandlers.play.postMessage(id);
+        button.onclick = play;
+        example.onclick = event => {
+          if (!event.target.closest('a') && event.target.closest('[data-audio-id]') === example) play();
+        };
         example.after(button);
       });
       </script></body></html>
