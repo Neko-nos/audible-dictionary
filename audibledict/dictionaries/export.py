@@ -10,17 +10,19 @@ def export_audio(
     output: Path,
     kind: str,
     accent: str | None = None,
-    fallback: bool = False,
 ) -> int:
-    """Export contextual JSONL jobs with deterministic relative audio filenames.
+    """Export JSONL speech inputs with recording IDs and dictionary sources.
+
+    Each record contains text and accent as TTS model inputs, plus id and
+    source to identify the recording and its dictionary. The consuming pipeline
+    constructs audio paths at generation time.
 
     Args:
         library (Path): Imported library folder.
         output (Path): Destination JSONL file.
         kind (str): examples or headwords.
-        accent (str | None): Headword accent, us or uk; None exports both.
-            Ignored for examples, which use English without a specified accent.
-        fallback (bool): Write output paths under audio/fallback.
+        accent (str | None): Speech accent, us or uk. When omitted, headwords
+            export both accents; examples use us for WISDOM and uk for ODE.
 
     Returns:
         int: Number of jobs written. No audio is synthesized.
@@ -30,28 +32,26 @@ def export_audio(
     )
     db.row_factory = sqlite3.Row
     if kind == "examples":
-        accents = [None]
-        rows = db.execute("""SELECT x.*, e.source, e.source_id, e.headword, e.pronunciations
+        rows = db.execute("""SELECT x.id, x.text, e.source
                              FROM examples x JOIN entries e ON e.id=x.entry_id ORDER BY x.id""")
     else:
-        accents = [accent] if accent else ["us", "uk"]
-        rows = db.execute("""SELECT audio_id AS id, id AS entry_id, source_id, source,
-                             headword, headword AS text, pronunciations FROM entries ORDER BY audio_id""")
+        rows = db.execute("""SELECT audio_id AS id, headword AS text, source
+                             FROM entries ORDER BY audio_id""")
     output.parent.mkdir(parents=True, exist_ok=True)
     count = 0
     with output.open("w", encoding="utf-8") as stream:
         for row in rows:
-            job = dict(row)
-            job["pronunciations"] = json.loads(job["pronunciations"])
-            job["kind"] = kind
+            if kind == "examples":
+                accents = [accent or {"WISDOM": "us", "ODE": "uk"}[row["source"]]]
+            else:
+                accents = [accent] if accent else ["us", "uk"]
             for voice_accent in accents:
-                directory = f"audio/{'fallback/' if fallback else ''}{job['source']}"
-                job["language"] = "en"
-                if voice_accent:
-                    directory += f"/{voice_accent}"
-                    job["accent"] = voice_accent
-                    job["language"] = "en-US" if voice_accent == "us" else "en-GB"
-                job["audio_path"] = f"{directory}/{job['id']}.caf"
+                job = {
+                    "text": row["text"],
+                    "accent": voice_accent,
+                    "id": row["id"],
+                    "source": row["source"],
+                }
                 stream.write(json.dumps(job, ensure_ascii=False) + "\n")
                 count += 1
     db.close()
