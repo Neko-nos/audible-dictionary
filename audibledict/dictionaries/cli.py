@@ -27,17 +27,15 @@ def main() -> None:
     sub.add_argument("--output", type=Path, required=True)
     sub.add_argument("--kind", choices=("examples", "headwords"), default="examples")
     sub.add_argument(
+        "-a",
         "--accent",
         choices=("us", "uk"),
-        help="Headwords only; exports both accents by default",
-    )
-    sub.add_argument(
-        "--fallback", action="store_true", help="Use audio/fallback output paths"
+        help="Speech accent; defaults to both for headwords, US for WISDOM examples, UK for ODE examples",
     )
     args = parser.parse_args()
     if args.command == "export":
         print(
-            f"Exported {export_audio(args.library, args.output, args.kind, args.accent, args.fallback):,} jobs to {args.output}"
+            f"Exported {export_audio(args.library, args.output, args.kind, args.accent):,} jobs to {args.output}"
         )
     else:
         bundles = discover(

@@ -89,35 +89,38 @@ def test_binary_import_and_both_export_kinds(tmp_path: Path) -> None:
     import_library(discover([bundles]), library)
     with sqlite3.connect(library / "dictionary.sqlite") as db:
         assert db.execute("SELECT COUNT(*) FROM entries").fetchone()[0] == 2
+        example_sources = dict(
+            db.execute("""SELECT x.id, e.source FROM examples x
+                          JOIN entries e ON e.id=x.entry_id""")
+        )
+        headword_sources = dict(db.execute("SELECT audio_id, source FROM entries"))
     export = tmp_path / "jobs.jsonl"
     assert export_audio(library, export, "examples") == 6
     jobs = [json.loads(line) for line in export.read_text().splitlines()]
     for job in jobs:
-        assert job["language"] == "en"
-        assert job["audio_path"] == f"audio/{job['source']}/{job['id']}.caf"
-    original_ids = [job["id"] for job in jobs]
+        source = example_sources[job["id"]]
+        assert job["accent"] == {"WISDOM": "us", "ODE": "uk"}[source]
+        assert job["source"] == source
     import_library(discover([bundles]), library)
-    export_audio(library, export, "examples", fallback=True)
-    fallback_jobs = [json.loads(line) for line in export.read_text().splitlines()]
-    assert original_ids == [job["id"] for job in fallback_jobs]
-    for job in fallback_jobs:
-        assert job["language"] == "en"
-        assert job["audio_path"] == f"audio/fallback/{job['source']}/{job['id']}.caf"
+    export_audio(library, export, "examples")
+    reimported_jobs = [json.loads(line) for line in export.read_text().splitlines()]
+    assert jobs == reimported_jobs
+    for accent in ("us", "uk"):
+        assert export_audio(library, export, "examples", accent) == 6
+        accented_jobs = [json.loads(line) for line in export.read_text().splitlines()]
+        assert accented_jobs == [{**job, "accent": accent} for job in jobs]
     assert export_audio(library, export, "headwords") == 4
     headwords = [json.loads(line) for line in export.read_text().splitlines()]
     assert {job["id"] for job in headwords[::2]} == {
         job["id"] for job in headwords[1::2]
     }
-    for job, (accent, language) in zip(
-        headwords, [("us", "en-US"), ("uk", "en-GB")] * 2
-    ):
-        assert job["kind"] == "headwords"
+    for job, accent in zip(headwords, ["us", "uk"] * 2):
+        source = headword_sources[job["id"]]
         assert job["accent"] == accent
-        assert job["language"] == language
-        assert job["audio_path"] == f"audio/{job['source']}/{accent}/{job['id']}.caf"
-    assert export_audio(library, export, "headwords", "uk", fallback=True) == 2
+        assert job["source"] == source
+    assert export_audio(library, export, "headwords", "uk") == 2
     for line in export.read_text().splitlines():
         job = json.loads(line)
+        source = headword_sources[job["id"]]
         assert job["accent"] == "uk"
-        assert job["language"] == "en-GB"
-        assert job["audio_path"] == f"audio/fallback/{job['source']}/uk/{job['id']}.caf"
+        assert job["source"] == source
