@@ -16,33 +16,35 @@ Open **`build/Audible Dictionary.app`**.
 
 ## Use
 
-- Search for a word or prefix and select a result. Filter by dictionary as needed.
-- Click **US/UK** to hear a headword in that accent.
-- Click an English example to hear it.
+- Search for a word, then click **US/UK** or an English example to hear it.
 - Press **⌘.** to stop playback or cancel generation.
 - Use **File → Open Library…** (⌘O) to choose another dictionary library.
 
-Missing headword and example recordings are generated when clicked and saved for later use.
+Missing recordings are generated on your Mac when clicked and saved for later use.
 
-## Export for speech generation
+## Generate recordings
 
-Export jobs for your TTS pipeline:
+Export speech jobs on your Mac:
 
 ```console
 uv run audibledict/dictionaries/cli.py export --output exports/examples.jsonl
 uv run audibledict/dictionaries/cli.py export --kind headwords --output exports/headwords.jsonl
 ```
 
-Each JSONL record contains four fields: `text` and `accent` are the TTS model inputs;
-`id` identifies the recording, and `source` identifies its dictionary (`WISDOM` or `ODE`).
+```console
+export CUDA_VISIBLE_DEVICES=0,1
+uv sync --extra tts
+uv run audibledict/tts/breeze/cli.py exports/examples.jsonl --output /path/to/audio
+uv run audibledict/tts/breeze/cli.py exports/headwords.jsonl --kind headwords --output /path/to/audio
+```
 
-Headwords export both `us` and `uk` accents by default. Examples export one recording,
-using `us` for WISDOM and `uk` for ODE.
+ASR checks allow 5% character error and up to 5 generation rounds; adjust these
+with `--max-cer` and `--max-attempts`. To replace remaining failures with Kokoro:
 
-Construct the destination at generation time from the export kind and record:
+```console
+uv run audibledict/tts/fallback/regenerate.py /path/to/audio/asr-examples.jsonl
+uv run audibledict/tts/fallback/regenerate.py /path/to/audio/asr-headwords.jsonl
+```
 
-- Examples: `audio/<source>/<id>.caf`
-- Headwords: `audio/<source>/<accent>/<id>.caf`
-
-For fallback recordings, use `audio/fallback/` in place of `audio/`. Place the
-resulting `audio/` folder beside the app (`build/audio/` for the setup above).
+Kokoro runs once and keeps recordings that still fail ASR.
+Copy the resulting audio folder to `build/audio/` on your Mac for playback.
