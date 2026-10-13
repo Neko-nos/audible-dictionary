@@ -1,14 +1,27 @@
 [project]
 name = "audible-dictionary"
 version = "0.1.0"
-# NumPy 2.5 requires Python 3.12+, while Kokoro excludes Python 3.13+.
+# vLLM-Omni targets Python 3.12, while Kokoro excludes Python 3.13+.
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "jaxtyping>=0.3.11",
     "kokoro>=0.9.4",
-    "numpy>=2.5.3",
+    # vLLM's mistral-common dependency requires NumPy <2.4.
+    "numpy>=2.3.5,<2.4",
     "soundfile>=0.14.0",
-    "torch>=2.14.0",
+    "torch>=2.13.0",
+]
+
+[project.optional-dependencies]
+# vLLM-Omni releases require the matching vLLM minor version.
+tts = [
+    "huggingface-hub>=1.31.0",
+    "jiwer>=4.0.0",
+    "regex>=2026.9.29",
+    "transformers>=5.13.0,<5.15",
+    "vllm[audio]>=0.30.0,<0.31; sys_platform == 'linux'",
+    "vllm-omni>=0.30.0,<0.31; sys_platform == 'linux'",
+    "en-core-web-sm",
 ]
 
 [dependency-groups]
@@ -20,3 +33,21 @@ requires = ["hatchling"]
 
 [tool.hatch.build]
 include = ["audibledict/*"]
+
+[tool.uv]
+# PyTorch's index also mirrors older dependencies; allow current releases from PyPI.
+index-strategy = "unsafe-best-match"
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu129", marker = "sys_platform == 'linux'" }
+vllm = { index = "vllm-cu129", marker = "sys_platform == 'linux'" }
+en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
+
+[[tool.uv.index]]
+name = "pytorch-cu129"
+url = "https://download.pytorch.org/whl/cu129"
+
+[[tool.uv.index]]
+name = "vllm-cu129"
+url = "https://wheels.vllm.ai/0.30.0/cu129"
+explicit = true
