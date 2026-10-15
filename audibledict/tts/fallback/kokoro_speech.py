@@ -1,4 +1,4 @@
-"""Generate one English fallback recording with official Kokoro on MPS."""
+"""Generate English fallback speech with official Kokoro."""
 
 import argparse
 import subprocess
@@ -13,19 +13,26 @@ from jaxtyping import Float
 from kokoro import KPipeline
 
 
-class Kokoro:
-    """Run full-precision Kokoro inference with PyTorch MPS."""
+class NoAudioError(ValueError):
+    """Kokoro produced no audio for the requested text."""
 
-    def __init__(self, source: str, accent: str | None = None) -> None:
-        """Initialize the official English speech pipeline on Metal.
+
+class Kokoro:
+    """Run full-precision Kokoro inference on a PyTorch device."""
+
+    def __init__(
+        self, source: str, accent: str | None = None, *, device: str = "mps"
+    ) -> None:
+        """Initialize the official English speech pipeline.
 
         Args:
             source (str): Dictionary supplying the text, WISDOM or ODE.
             accent (str | None): Headword accent, us or uk; examples use the
                 dictionary's accent when omitted.
+            device (str): PyTorch device for inference.
 
         Raises:
-            RuntimeError: Metal is unavailable.
+            RuntimeError: The requested device is unavailable.
         """
         accent = accent or {"WISDOM": "us", "ODE": "uk"}[source]
         lang_code, self.voice = {
@@ -34,7 +41,7 @@ class Kokoro:
             # ref: https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md#british-english
             "uk": ("b", "bf_emma"),
         }[accent]
-        self.pipeline = KPipeline(lang_code=lang_code, device="mps")
+        self.pipeline = KPipeline(lang_code=lang_code, device=device)
 
     def synthesize(self, text: str) -> Float[np.ndarray, " samples"]:
         """Synthesize the requested text, joining any model-sized chunks.
@@ -44,8 +51,13 @@ class Kokoro:
 
         Returns:
             Float[np.ndarray, " samples"]: Mono waveform at the model's sample rate.
+
+        Raises:
+            NoAudioError: The pipeline yielded no audio chunks.
         """
         chunks = [result.audio for result in self.pipeline(text, voice=self.voice)]
+        if not chunks:
+            raise NoAudioError("Kokoro produced no audio chunks")
         audio: Float[torch.Tensor, " samples"] = torch.cat(chunks)
         return audio.numpy()
 

@@ -1,8 +1,14 @@
+# Build outputs
 .build/
 build/
+
+# Generated data and logs
 exports/
-__pycache__/
-.ruff_cache/
+logs/
+
+# Local caches and environments
+.cache/
 .pytest_cache/
+.ruff_cache/
 .venv/
-.DS_Store
+__pycache__/
