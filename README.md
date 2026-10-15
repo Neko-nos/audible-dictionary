@@ -47,4 +47,20 @@ uv run audibledict/tts/fallback/regenerate.py /path/to/audio/asr-headwords.jsonl
 ```
 
 Kokoro runs once and keeps recordings that still fail ASR.
-Copy the resulting audio folder to `build/audio/` on your Mac for playback.
+
+## Compress and transfer recordings
+
+On Ubuntu, create independent ALAC/CAF ZIPs of about 1 GB each:
+
+```console
+uv run scripts/compress_audio.py /path/to/audio -o audio-alac
+```
+
+On your Mac, download and convert the ZIPs automatically to 32 kbit/s Opus/CAF:
+
+```console
+uv run scripts/extract_audio.py 'user@host:/path/to/audio-alac/*.zip' -o build/audio
+```
+
+Uses your normal SSH configuration. Only one ZIP is downloaded at a time.
+Recordings are saved directly under `build/audio/ODE/` and `build/audio/WISDOM/`.
