@@ -26,10 +26,10 @@ def import_library(bundles: dict[str, Path], output: Path) -> None:
             DROP TABLE IF EXISTS dictionaries;
             CREATE TABLE dictionaries (source TEXT PRIMARY KEY, resource_path TEXT, css TEXT);
             CREATE TABLE entries (id TEXT PRIMARY KEY, source TEXT, source_id TEXT,
-                headword TEXT, search_key TEXT, audio_id TEXT, html TEXT, pronunciations TEXT);
+                headword TEXT, search_key TEXT, audio_id TEXT, html TEXT);
             CREATE TABLE aliases (term TEXT, entry_id TEXT, PRIMARY KEY (term, entry_id));
-            CREATE TABLE examples (id TEXT PRIMARY KEY, entry_id TEXT, sense_id TEXT,
-                text TEXT, context TEXT, needs_review INTEGER);
+            CREATE TABLE examples (id TEXT PRIMARY KEY, entry_id TEXT,
+                text TEXT, needs_review INTEGER);
             CREATE INDEX entries_reference ON entries(source, source_id);
             CREATE INDEX examples_entry ON examples(entry_id);
         """)
@@ -50,11 +50,11 @@ def import_library(bundles: dict[str, Path], output: Path) -> None:
                     continue
                 entry, examples, aliases = parsed
                 db.execute(
-                    "INSERT INTO entries VALUES (:id,:source,:source_id,:headword,:search_key,:audio_id,:html,:pronunciations)",
+                    "INSERT INTO entries VALUES (:id,:source,:source_id,:headword,:search_key,:audio_id,:html)",
                     entry,
                 )
                 db.executemany(
-                    "INSERT OR IGNORE INTO examples VALUES (:id,:entry_id,:sense_id,:text,:context,:needs_review)",
+                    "INSERT OR IGNORE INTO examples VALUES (:id,:entry_id,:text,:needs_review)",
                     examples,
                 )
                 db.executemany(

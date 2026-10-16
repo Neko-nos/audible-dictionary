@@ -65,10 +65,9 @@ def write_bundle(folder: Path, source: str, records: list[bytes]) -> Path:
     return bundle
 
 
-def test_example_text_context_and_identity() -> None:
+def test_example_text_and_identity() -> None:
     entry, examples, aliases = parse_entry("WISDOM", ET.fromstring(dummy_entry()))
     assert examples[0]["text"] == "The lumifern glows softly."
-    assert examples[0]["context"] == "架空の光る植物"
     assert examples[1]["text"] == "A [the] lumifern glows."
     assert examples[1]["needs_review"]
     assert len(examples) == 3
