@@ -219,6 +219,7 @@ tts = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "jiwer" },
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -242,6 +243,7 @@ provides-extras = ["tts"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "jiwer", specifier = ">=4.0.0" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "ruff", specifier = ">=0.16.7" },
 ]
