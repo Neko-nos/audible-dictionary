@@ -17,7 +17,6 @@ Open **`build/Audible Dictionary.app`**.
 ## Use
 
 - Search for a word, then click **US/UK** or an English example to hear it.
-- Press **⌘.** to stop playback or cancel generation.
 - Use **File → Open Library…** (⌘O) to choose another dictionary library.
 
 Missing recordings are generated on your Mac when clicked and saved for later use.

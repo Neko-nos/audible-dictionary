@@ -5,15 +5,20 @@ import WebKit
 struct EntryWebView: NSViewRepresentable {
   let entry: Entry
   let audioFolder: URL
+  let textSize: Double
   let matchedTerm: String?
   let play: (String) -> Void
+  let playHeadword: (Accent) -> Void
   let follow: (String) -> Void
 
-  func makeCoordinator() -> Coordinator { Coordinator(play: play, follow: follow) }
+  func makeCoordinator() -> Coordinator {
+    Coordinator(play: play, playHeadword: playHeadword, follow: follow)
+  }
 
   func makeNSView(context: Context) -> WKWebView {
     let configuration = WKWebViewConfiguration()
     configuration.userContentController.add(context.coordinator, name: "play")
+    configuration.userContentController.add(context.coordinator, name: "headword")
     let view = WKWebView(frame: .zero, configuration: configuration)
     view.navigationDelegate = context.coordinator
     view.setValue(false, forKey: "drawsBackground")
@@ -22,7 +27,10 @@ struct EntryWebView: NSViewRepresentable {
 
   func updateNSView(_ view: WKWebView, context: Context) {
     context.coordinator.play = play
+    context.coordinator.playHeadword = playHeadword
     context.coordinator.follow = follow
+    // The dictionaries' 12pt body size is 16 CSS pixels at their original scale.
+    view.pageZoom = textSize / 16
     let localIDs = entry.examples.filter {
       AudioFiles.local(id: $0.id, source: entry.summary.source, folder: audioFolder)
         != nil
@@ -43,17 +51,14 @@ struct EntryWebView: NSViewRepresentable {
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src file: data:">
       <style>\(entry.css)
       :root { color-scheme: light dark; }
-      body { padding: 12px 24px 48px; margin: 0; font-size: 17px; line-height: 1.6; }
-      .entry > .hg, .entry > .hwg { padding-bottom: 16px; }
-      .ex { background: light-dark(#f0f5f3, #263730); border-radius: 3px; }
       .lookup-match { background: light-dark(#bed8fc, #294f7c); }
       [data-audio-id] { cursor: pointer; }
-      .audio-button { font: 11px -apple-system; cursor: pointer; margin: 0 5px; padding: 3px 7px;
-        color: light-dark(#17694d, #8bdfb3); border: 1px solid light-dark(#b9d5c6,#426653);
-        border-radius: 5px; background: light-dark(#f3faf6,#23392e); vertical-align: 1px; }
-      .audio-button:focus-visible { outline: 2px solid #258b68; }
-      .audio-button:hover:enabled { background: light-dark(#dcefe3,#365344); }
-      .audio-button:disabled { opacity: 0.5; cursor: default; }
+      .headword-audio { display: inline-flex; gap: 4px; margin-left: 12px; vertical-align: middle; }
+      .audio-button { font: 11px -apple-system; cursor: pointer; margin: 0 3px; padding: 3px 5px;
+        color: light-dark(#666, #bbb); border: 0; border-radius: 4px;
+        background: transparent; vertical-align: 1px; }
+      .audio-button:focus-visible { outline: 2px solid Highlight; }
+      .audio-button:hover { background: light-dark(#eee, #333); }
       [data-d-pr="US"] { display: none; }
       </style></head><body>\(entry.html)
       <script>
@@ -69,11 +74,26 @@ struct EntryWebView: NSViewRepresentable {
           requestAnimationFrame(() => section.scrollIntoView({block: 'nearest'}));
         }
       }
+      const heading = document.querySelector('.entry > .hwg, .entry > .hg, .entry > .hw');
+      if (heading) {
+        const controls = document.createElement('span');
+        controls.className = 'headword-audio';
+        ['us', 'uk'].forEach(accent => {
+          const button = document.createElement('button');
+          button.className = 'audio-button';
+          button.textContent = '▶ ' + accent.toUpperCase();
+          button.title = 'Play ' + accent.toUpperCase() + ' headword pronunciation';
+          button.setAttribute('aria-label', button.title);
+          button.onclick = () => window.webkit.messageHandlers.headword.postMessage(accent);
+          controls.append(button);
+        });
+        heading.append(controls);
+      }
       document.querySelectorAll('[data-audio-id]').forEach(example => {
         const id = example.dataset.audioId;
         const button = document.createElement('button');
         button.className = 'audio-button';
-        button.textContent = '▶ Audio';
+        button.textContent = '▶';
         button.title = (imported.has(id) ? 'Play audio' : 'Generate and play speech') +
           (review.has(id) ? ' · Example contains editorial alternatives' : '');
         button.setAttribute('aria-label', button.title + ': ' + example.textContent);
@@ -91,23 +111,35 @@ struct EntryWebView: NSViewRepresentable {
 
   static func dismantleNSView(_ view: WKWebView, coordinator: Coordinator) {
     view.configuration.userContentController.removeScriptMessageHandler(forName: "play")
+    view.configuration.userContentController.removeScriptMessageHandler(forName: "headword")
     view.navigationDelegate = nil
   }
 
   @MainActor final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     var key = ""
     var play: (String) -> Void
+    var playHeadword: (Accent) -> Void
     var follow: (String) -> Void
 
-    init(play: @escaping (String) -> Void, follow: @escaping (String) -> Void) {
+    init(
+      play: @escaping (String) -> Void, playHeadword: @escaping (Accent) -> Void,
+      follow: @escaping (String) -> Void
+    ) {
       self.play = play
+      self.playHeadword = playHeadword
       self.follow = follow
     }
 
     func userContentController(
       _ userContentController: WKUserContentController, didReceive message: WKScriptMessage
     ) {
-      if let id = message.body as? String { play(id) }
+      if let value = message.body as? String {
+        if message.name == "headword", let accent = Accent(rawValue: value) {
+          playHeadword(accent)
+        } else if message.name == "play" {
+          play(value)
+        }
+      }
     }
 
     func webView(
