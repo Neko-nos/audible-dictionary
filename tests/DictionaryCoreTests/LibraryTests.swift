@@ -15,27 +15,75 @@ struct LibraryTests {
       CREATE TABLE entries(id TEXT,source TEXT,source_id TEXT,headword TEXT,search_key TEXT,audio_id TEXT,html TEXT);
       INSERT INTO entries VALUES('a','ODE','dummy_a','lumifern','lumifern','audio_a','<p>Invented plant</p>'),
         ('b','WISDOM','dummy_b','lumiferna','lumiferna','audio_b','<p>架空の植物</p>'),
-        ('c','ODE','dummy_c','100%lumifern','100%lumifern','audio_c','');
-      CREATE TABLE aliases(term TEXT,entry_id TEXT);
-      INSERT INTO aliases VALUES('lumifern','a'),('lumiferna','b'),('lumiferns','a'),('100%lumifern','c');
+        ('c','ODE','dummy_c','100%lumifern','100%lumifern','audio_c',''),
+        ('d','WISDOM','dummy_d','lumifernability','lumifernability','audio_d',''),
+        ('e','ODE','dummy_e','kumifernability','kumifernability','audio_e',''),
+        ('f','ODE','dummy_f','zavu','zavu','audio_f','');
+      CREATE TABLE aliases(term TEXT,entry_id TEXT,PRIMARY KEY(term,entry_id));
+      INSERT INTO aliases VALUES('lumifern','a'),('lumiferna','b'),('lumiferns','a'),('100%lumifern','c'),
+        ('lumifernability','a'),('lumifernability','d'),('aumifernability','a'),
+        ('lumifern sprig','a'),('lumifern stone','a'),
+        ('kumifernability','e'),('zavu','f');
       CREATE TABLE examples(id TEXT,entry_id TEXT,text TEXT,needs_review INTEGER);
       INSERT INTO examples VALUES('example_a','a','The lumifern glows softly.',0);
       """
     try await database.write { db in try db.execute(sql: sql) }
     let library = try Library(folder: folder)
     let results = try await library.search("LUMIFERN", source: "All")
-    #expect(results.map(\.id) == ["a", "b"])
+    #expect(results.map(\.entryID) == ["a", "a", "a", "b", "d", "a", "a"])
+    #expect(
+      results.map(\.title) == [
+        "lumifern", "lumifern sprig", "lumifern stone", "lumiferna",
+        "lumifernability", "lumifernability", "lumiferns",
+      ])
+    #expect(Set(results.map(\.id)).count == results.count)
     let filtered = try await library.search("lumi", source: "WISDOM")
-    #expect(filtered.map(\.id) == ["b"])
+    #expect(filtered.map(\.entryID) == ["b", "d"])
+    let derivative = try await library.search("lumifernability", source: "All")
+    #expect(derivative.map(\.entryID) == ["d", "a"])
+    #expect(derivative.map(\.title) == ["lumifernability", "lumifernability"])
+    let derivedPrefix = try await library.search("lumifernabilit", source: "All")
+    #expect(derivedPrefix.map(\.entryID) == ["d", "a"])
+    let compound = try await library.search("lumifern sprig", source: "ODE")
+    #expect(compound.map(\.title) == ["lumifern sprig"])
+    let parent = try await library.entry(#require(compound.first).entryID)
+    #expect(parent?.summary.headword == "lumifern")
+    let compoundTypo = try await library.search("lumifern sprigg", source: "ODE")
+    #expect(compoundTypo.map(\.id) == compound.map(\.id))
+    for typo in ["lumifren", "lumfern", "lumiffern", "lumixern", "xumifern"] {
+      let suggestions = try await library.search(typo, source: "ODE")
+      #expect(suggestions.first?.entryID == "a")
+      #expect(suggestions.first?.title == "lumifern")
+    }
+    let trailingTypo = try await library.search("lumiferndd", source: "ODE")
+    #expect(trailingTypo.map(\.title) == ["lumifern", "lumiferns"])
+    #expect(Set(trailingTypo.map(\.id)).count == 2)
+    let derivedTypo = try await library.search("lumifernabilty", source: "ODE")
+    #expect(derivedTypo.map(\.entryID) == ["a", "e", "a"])
+    #expect(derivedTypo.map(\.title) == ["lumifernability", "kumifernability", "aumifernability"])
+    for typo in ["lumifrenabilty", "lumifrnabilty", "lummifernabiility"] {
+      let twoEdits = try await library.search(typo, source: "ODE")
+      #expect(twoEdits.map(\.entryID) == ["a"])
+      #expect(twoEdits.first?.title == "lumifernability")
+    }
+    let distant = try await library.search("xumifrenabilty", source: "All")
+    #expect(distant.isEmpty)
+    let shortTypo = try await library.search("zavx", source: "ODE")
+    #expect(shortTypo.map(\.entryID) == ["f"])
+    let shortDistant = try await library.search("zaxx", source: "ODE")
+    #expect(shortDistant.isEmpty)
+    let filteredTypo = try await library.search("lumifrena", source: "WISDOM")
+    #expect(filteredTypo.map(\.entryID) == ["b"])
     let punctuation = try await library.search("100%", source: "All")
-    #expect(punctuation.map(\.id) == ["c"])
+    #expect(punctuation.map(\.entryID) == ["c"])
     let entry = try await library.entry("a")
     #expect(entry?.html == "<p>Invented plant</p>")
     #expect(entry?.examples.first?.id == "example_a")
     #expect(entry?.examples.first?.text == "The lumifern glows softly.")
     #expect(entry?.examples.first?.needsReview == false)
     let reference = try await library.reference("dummy_a", source: "ODE")
-    #expect(reference?.id == "a")
+    #expect(reference?.entryID == "a")
+    #expect(reference?.id == results.first?.id)
   }
 
   @Test(arguments: [(nil, "ODE"), (Accent.us, "ODE/us"), (Accent.uk, "ODE/uk")])

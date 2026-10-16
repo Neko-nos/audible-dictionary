@@ -19,6 +19,11 @@ def dummy_entry(source_id: str = "WDEJ_dummy", title: str = "lumifern") -> bytes
     return f'''<d:entry xmlns:d="http://www.apple.com/DTDs/DictionaryService-1.0.rng"
         id="{source_id}" d:title="{title}">
         <span class="hw">{title}</span>
+        <span class="drvsec"><span class="drv">lumi･f<span class="str">è</span>rn･abil･i･ty<span class="pr"> /dummy/</span></span></span>
+        <span class="drv"><span class="rf">～</span>･ly</span>
+        <span class="csec"><span class="cwg"><span class="cw"><span class="str"><span class="rf">～̀</span></span> spr<span class="str">í</span>g </span></span>
+          <span class="trans">架空の小枝</span>
+        </span>
         <span class="semb" id="{source_id}_sense">
           <span d:def="1" class="trans">架空の光る植物</span>
           <span class="ex">The lumi<span class="italic">fern</span> glows softly.</span>
@@ -75,6 +80,11 @@ def test_example_text_and_identity() -> None:
     assert 'data-audio-id="' + examples[0]["id"] + '"' in entry["html"]
     assert '<span class="note">Dummy note</span>' in entry["html"]
     assert "lumifern" in aliases
+    assert "lumifernability" in aliases
+    assert "lumifernly" in aliases
+    assert "lumifern sprig" in aliases
+    assert 'data-search-term="lumifernability"' in entry["html"]
+    assert 'data-search-term="lumifern sprig"' in entry["html"]
 
 
 def test_binary_import_and_both_export_kinds(tmp_path: Path) -> None:
@@ -88,6 +98,19 @@ def test_binary_import_and_both_export_kinds(tmp_path: Path) -> None:
     import_library(discover([bundles]), library)
     with sqlite3.connect(library / "dictionary.sqlite") as db:
         assert db.execute("SELECT COUNT(*) FROM entries").fetchone()[0] == 2
+        assert db.execute(
+            "SELECT entry_id FROM aliases WHERE term=? ORDER BY entry_id",
+            ("lumifernability",),
+        ).fetchall() == [("ODE:m_dummy",), ("WISDOM:WDEJ_dummy",)]
+        assert db.execute(
+            "SELECT term FROM aliases WHERE entry_id=? AND term LIKE ? ORDER BY term",
+            ("WISDOM:WDEJ_dummy", "lumifern%"),
+        ).fetchall() == [
+            ("lumifern",),
+            ("lumifern sprig",),
+            ("lumifernability",),
+            ("lumifernly",),
+        ]
         example_sources = dict(
             db.execute("""SELECT x.id, e.source FROM examples x
                           JOIN entries e ON e.id=x.entry_id""")

@@ -111,9 +111,15 @@ private struct DictionaryView: View {
         .font(.callout).foregroundStyle(.secondary).padding(.horizontal, 14)
         Spacer()
       } else {
+        if model.isSpellingSuggestion {
+          Text("Did you mean?")
+            .font(.callout.weight(.semibold)).foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.bottom, 8)
+        }
         List(model.results, selection: $model.selection) { item in
           VStack(alignment: .leading, spacing: 4) {
-            Text(item.headword).font(.system(size: 17, design: .serif)).lineLimit(2)
+            Text(item.title).font(.system(size: 17, design: .serif)).lineLimit(2)
             Text(item.source).font(.caption2.weight(.medium)).foregroundStyle(.secondary)
           }.padding(.vertical, 5).tag(item.id)
         }.listStyle(.sidebar)
@@ -152,7 +158,7 @@ private struct DictionaryView: View {
         }.padding(.horizontal, 24).padding(.vertical, 18)
         Divider()
         EntryWebView(
-          entry: entry, audioFolder: audioFolder,
+          entry: entry, audioFolder: audioFolder, matchedTerm: model.selection?.matchedTerm,
           play: model.playExample, follow: model.follow)
       }
     } else {

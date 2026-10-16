@@ -6,8 +6,9 @@ import SwiftUI
 final class DictionaryModel: ObservableObject {
   @Published var query = ""
   @Published var source = "All"
-  @Published var selection: String?
+  @Published var selection: EntrySummary.ID?
   @Published var results: [EntrySummary] = []
+  @Published private(set) var isSpellingSuggestion = false
   @Published var entry: Entry?
   @Published var error: String?
   @Published private(set) var library: Library?
@@ -50,6 +51,7 @@ final class DictionaryModel: ObservableObject {
       entry = nil
       selection = nil
       results = []
+      isSpellingSuggestion = false
       error = nil
       UserDefaults.standard.set(url.path, forKey: "libraryFolder")
       Task { await search() }
@@ -64,6 +66,9 @@ final class DictionaryModel: ObservableObject {
       let matches = try await library.search(currentQuery, source: currentSource)
       if Task.isCancelled || currentQuery != query || currentSource != source { return }
       results = matches
+      let term = Library.normalized(currentQuery)
+      isSpellingSuggestion =
+        !matches.isEmpty && !matches.contains { $0.matchedTerm.hasPrefix(term) }
       if !matches.contains(where: { $0.id == selection }) { selection = matches.first?.id }
       error = nil
     } catch { self.error = error.localizedDescription }
@@ -74,7 +79,7 @@ final class DictionaryModel: ObservableObject {
     entry = nil
     guard let selection, let library else { return }
     do {
-      let loaded = try await library.entry(selection)
+      let loaded = try await library.entry(selection.entryID)
       if Task.isCancelled || selection != self.selection { return }
       entry = loaded
     } catch { self.error = error.localizedDescription }
@@ -88,7 +93,7 @@ final class DictionaryModel: ObservableObject {
       Task {
         do {
           if let match = try await library?.reference(sourceID, source: entry.summary.source) {
-            if !results.contains(match) { results.insert(match, at: 0) }
+            if !results.contains(where: { $0.id == match.id }) { results.insert(match, at: 0) }
             selection = match.id
           } else {
             error = "That cross-reference is not available in the imported English entries."

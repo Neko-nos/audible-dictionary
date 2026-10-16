@@ -5,6 +5,7 @@ import WebKit
 struct EntryWebView: NSViewRepresentable {
   let entry: Entry
   let audioFolder: URL
+  let matchedTerm: String?
   let play: (String) -> Void
   let follow: (String) -> Void
 
@@ -26,13 +27,16 @@ struct EntryWebView: NSViewRepresentable {
       AudioFiles.local(id: $0.id, source: entry.summary.source, folder: audioFolder)
         != nil
     }.map(\.id)
-    let key = entry.summary.id + audioFolder.path + localIDs.joined()
+    let key = entry.summary.entryID + audioFolder.path + localIDs.joined() + (matchedTerm ?? "")
     if context.coordinator.key == key { return }
     context.coordinator.key = key
     let imported = String(data: try! JSONEncoder().encode(localIDs), encoding: .utf8)!
     let reviewIDs = String(
       data: try! JSONEncoder().encode(entry.examples.filter(\.needsReview).map(\.id)),
       encoding: .utf8)!
+    let match = String(data: try! JSONEncoder().encode(matchedTerm), encoding: .utf8)!
+    let headword = String(
+      data: try! JSONEncoder().encode(Library.normalized(entry.summary.headword)), encoding: .utf8)!
     let html = """
       <!doctype html><html><head><meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -42,6 +46,7 @@ struct EntryWebView: NSViewRepresentable {
       body { padding: 12px 24px 48px; margin: 0; font-size: 17px; line-height: 1.6; }
       .entry > .hg, .entry > .hwg { padding-bottom: 16px; }
       .ex { background: light-dark(#f0f5f3, #263730); border-radius: 3px; }
+      .lookup-match { background: light-dark(#bed8fc, #294f7c); }
       [data-audio-id] { cursor: pointer; }
       .audio-button { font: 11px -apple-system; cursor: pointer; margin: 0 5px; padding: 3px 7px;
         color: light-dark(#17694d, #8bdfb3); border: 1px solid light-dark(#b9d5c6,#426653);
@@ -54,6 +59,16 @@ struct EntryWebView: NSViewRepresentable {
       <script>
       const imported = new Set(\(imported));
       const review = new Set(\(reviewIDs));
+      const match = \(match);
+      if (match && match !== \(headword)) {
+        const word = Array.from(document.querySelectorAll('[data-search-term]'))
+          .find(node => node.dataset.searchTerm === match);
+        if (word) {
+          const section = word.closest('.drvsec, .csec') || word;
+          section.classList.add('lookup-match');
+          requestAnimationFrame(() => section.scrollIntoView({block: 'nearest'}));
+        }
+      }
       document.querySelectorAll('[data-audio-id]').forEach(example => {
         const id = example.dataset.audioId;
         const button = document.createElement('button');

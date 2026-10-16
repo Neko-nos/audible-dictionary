@@ -60,6 +60,29 @@ def plain_text(node: ET.Element, omit_labels: bool = False) -> str:
     return WHITESPACE.sub(" ", "".join(parts))
 
 
+def typeset_spelling(node: ET.Element, headword: str) -> str:
+    """Recover a searchable spelling from a WISDOM derivative or compound.
+
+    Args:
+        node (ET.Element): Word element, including stress markup.
+        headword (str): Word substituted for the dictionary's repetition mark.
+
+    Returns:
+        str: Spelling without pronunciation, stress, or syllable separators.
+    """
+    text = (node.text or "") + "".join(
+        ("" if "pr" in child.attrib.get("class", "").split() else plain_text(child))
+        + (child.tail or "")
+        for child in node
+    )
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    text = text.translate(str.maketrans("", "", "・·ˈˌ"))
+    for mark in ("~", "〜"):
+        text = text.replace(mark, headword)
+    return normalized(text)
+
+
 def parse_entry(
     source: str, root: ET.Element
 ) -> tuple[dict, list[dict], set[str]] | None:
@@ -84,10 +107,15 @@ def parse_entry(
     aliases = {normalized(headword)}
     for node in root.iter():
         classes = node.attrib.get("class", "").split()
-        if set(classes) & {"hw", "hv", "subhw", "l", "f", "frm"}:
-            alias = normalized(node.attrib.get("normalized", plain_text(node).strip()))
+        if set(classes) & {"hw", "hv", "subhw", "l", "f", "frm", "drv", "cw"}:
+            alias = (
+                typeset_spelling(node, headword)
+                if set(classes) & {"drv", "cw"}
+                else normalized(node.attrib.get("normalized", plain_text(node).strip()))
+            )
             if alias and not JAPANESE.search(alias):
                 aliases.add(alias)
+                node.set("data-search-term", alias)
         if "ex" not in classes:
             continue
         text = plain_text(node, omit_labels=True).strip()

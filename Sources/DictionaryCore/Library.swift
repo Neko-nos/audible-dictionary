@@ -1,14 +1,26 @@
 import Foundation
 import GRDB
 
-public struct EntrySummary: Decodable, FetchableRecord, Identifiable, Hashable, Sendable {
-  public let id: String
+public struct EntrySummary: Decodable, FetchableRecord, Identifiable, Sendable {
+  public let entryID: String
   public let source: String
   public let headword: String
   public let audioID: String
+  public let matchedTerm: String
+
+  public struct ID: Hashable, Sendable {
+    public let entryID: String
+    public let matchedTerm: String
+  }
+
+  public var id: ID { ID(entryID: entryID, matchedTerm: matchedTerm) }
+
+  public var title: String {
+    matchedTerm == Library.normalized(headword) ? headword : matchedTerm
+  }
 }
 
-public struct Example: Decodable, FetchableRecord, Identifiable, Sendable {
+public struct Example: Decodable, FetchableRecord, Sendable {
   public let id: String
   public let text: String
   public let needsReview: Bool
@@ -47,17 +59,66 @@ public actor Library {
     if term.isEmpty { return [] }
     // Range matching uses the index and treats punctuation literally, including % and _.
     return try database.read { db in
-      try EntrySummary.fetchAll(
+      let matches = try EntrySummary.fetchAll(
         db,
         sql:
           """
-          SELECT DISTINCT e.id, e.source, e.headword, e.audio_id AS audioID, e.search_key
+          SELECT e.id AS entryID, e.source, e.headword, e.audio_id AS audioID, a.term AS matchedTerm
           FROM aliases a JOIN entries e ON e.id = a.entry_id
           WHERE a.term >= ? AND a.term < ? AND (? = 'All' OR e.source = ?)
-          ORDER BY CASE WHEN e.search_key = ? THEN 0 WHEN a.term = ? THEN 1 ELSE 2 END,
-              e.search_key, e.source, e.id LIMIT 100
-          """, arguments: [term, term + "\u{10FFFF}", source, source, term, term])
+          ORDER BY a.term, a.term != e.search_key, e.source, e.id LIMIT 100
+          """, arguments: [term, term + "\u{10FFFF}", source, source])
+      // Short fragments have too many plausible corrections to suggest a useful word.
+      if !matches.isEmpty || term.count < 4 { return matches }
+      let letters = Array(term)
+      // Allow one edit for 4–7 characters and at most two for longer queries.
+      let limit = min(2, letters.count / 4)
+      db.add(
+        function: DatabaseFunction("spellingDistance", argumentCount: 1, pure: true) { values in
+          Self.spellingDistance(String.fromDatabaseValue(values[0])!, from: letters, limit: limit)
+        })
+      return try EntrySummary.fetchAll(
+        db,
+        sql:
+          """
+          SELECT e.id AS entryID, e.source, e.headword, e.audio_id AS audioID,
+              a.term AS matchedTerm, spellingDistance(a.term) AS distance
+          FROM aliases a JOIN entries e ON e.id = a.entry_id
+          WHERE length(a.term) BETWEEN ? AND ? AND distance <= ? AND (? = 'All' OR e.source = ?)
+          ORDER BY distance, a.term != e.search_key, a.term, e.source, e.id LIMIT 100
+          """, arguments: [letters.count - limit, letters.count + limit, limit, source, source])
     }
+  }
+
+  private static func spellingDistance(_ term: String, from query: [Character], limit: Int) -> Int {
+    let letters = Array(term)
+    var previous = Array(0...query.count)
+    var older = Array(repeating: limit + 1, count: query.count + 1)
+    var current = older
+    for row in 1...letters.count {
+      current[0] = row
+      // Cells beyond this diagonal band cannot lead to a match within the edit limit.
+      let start = max(1, row - limit)
+      let end = min(query.count, row + limit)
+      if start > 1 { current[start - 1] = limit + 1 }
+      if end < query.count { current[end + 1] = limit + 1 }
+      var best = current[0]
+      for column in start...end {
+        current[column] = min(
+          previous[column] + 1, current[column - 1] + 1,
+          previous[column - 1] + (letters[row - 1] == query[column - 1] ? 0 : 1))
+        if row > 1 && column > 1 && letters[row - 1] == query[column - 2]
+          && letters[row - 2] == query[column - 1]
+        {
+          current[column] = min(current[column], older[column - 2] + 1)
+        }
+        best = min(best, current[column])
+      }
+      if best > limit { return limit + 1 }
+      swap(&older, &previous)
+      swap(&previous, &current)
+    }
+    return previous[query.count]
   }
 
   public func entry(_ id: String) throws -> Entry? {
@@ -67,7 +128,8 @@ public actor Library {
           db,
           sql:
             """
-            SELECT e.id,e.source,e.headword,e.audio_id AS audioID,e.html,d.css,d.resource_path
+            SELECT e.id AS entryID,e.source,e.headword,e.audio_id AS audioID,e.search_key AS matchedTerm,
+                e.html,d.css,d.resource_path
             FROM entries e JOIN dictionaries d ON d.source=e.source WHERE e.id=?
             """, arguments: [id])
       else { return nil }
@@ -85,7 +147,10 @@ public actor Library {
       try EntrySummary.fetchOne(
         db,
         sql:
-          "SELECT id,source,headword,audio_id AS audioID FROM entries WHERE source_id=? AND source=?",
+          """
+          SELECT id AS entryID,source,headword,audio_id AS audioID,search_key AS matchedTerm
+          FROM entries WHERE source_id=? AND source=?
+          """,
         arguments: [sourceID, source])
     }
   }
