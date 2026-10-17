@@ -1,8 +1,7 @@
 import Foundation
 
-public enum Accent: String, CaseIterable, Identifiable, Sendable {
+public enum Accent: String, Sendable {
   case us, uk
-  public var id: String { rawValue }
   public var label: String { rawValue.uppercased() }
 }
 

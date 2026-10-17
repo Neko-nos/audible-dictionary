@@ -1,5 +1,6 @@
 # Source: https://github.com/huggingface/open_asr_leaderboard/blob/e06775bad2ee30fa0d88a67570413047bf762261/normalizer/normalizer.py
-# Vendored under Apache-2.0; only formatting, imports, and type hints are adjusted.
+# Vendored under Apache-2.0; unused non-English normalizers are omitted.
+# Formatting, imports, and type hints are adjusted.
 
 # Copyright 2022 The OpenAI team and The HuggingFace Team. All rights reserved.
 # Most of the code is copy pasted from the original whisper repository
@@ -21,8 +22,6 @@ import unicodedata
 from collections.abc import Iterator
 from fractions import Fraction
 from re import Match
-
-import regex
 
 from .english_abbreviations import (
     english_compound_normalizer,
@@ -72,77 +71,6 @@ def remove_symbols_and_diacritics(s: str, keep=""):
         return char
 
     return "".join(replace_character(c) for c in unicodedata.normalize("NFKD", s))
-
-
-def remove_symbols(s: str):
-    """
-    Replace any other markers, symbols, punctuations with a space, keeping diacritics
-    """
-    return "".join(
-        " " if unicodedata.category(c)[0] in "MSP" else c
-        for c in unicodedata.normalize("NFKC", s)
-    )
-
-
-def remove_symbols_keep_marks(s: str):
-    """
-    Replace symbols and punctuation with a space, keeping combining marks.
-
-    Unlike `remove_symbols`, combining marks (category 'M') are preserved. This
-    is required for scripts like Devanagari, where vowel signs (matras) and the
-    virama are combining marks that are integral to words.
-    """
-    return "".join(
-        " " if unicodedata.category(c)[0] in "SP" else c
-        for c in unicodedata.normalize("NFKC", s)
-    )
-
-
-class BasicTextNormalizer:
-    def __init__(self, remove_diacritics: bool = False, split_letters: bool = False):
-        self.clean = (
-            remove_symbols_and_diacritics if remove_diacritics else remove_symbols
-        )
-        self.split_letters = split_letters
-
-    def __call__(self, s: str):
-        s = s.lower()
-        s = re.sub(r"[<\[][^>\]]*[>\]]", "", s)  # remove words between brackets
-        s = re.sub(r"\(([^)]+?)\)", "", s)  # remove words between parenthesis
-        s = self.clean(s).lower()
-
-        if self.split_letters:
-            s = " ".join(regex.findall(r"\X", s, regex.U))
-
-        s = re.sub(
-            r"\s+", " ", s
-        )  # replace any successive whitespace characters with a space
-
-        return s
-
-
-class BasicMultilingualTextNormalizer:
-    def __init__(self, remove_diacritics: bool = True):
-        # When keeping diacritics, also keep combining marks (category 'M'):
-        # scripts like Devanagari encode vowel signs and the virama as
-        # combining marks, so stripping them mangles words.
-        self.clean = (
-            remove_symbols_and_diacritics
-            if remove_diacritics
-            else remove_symbols_keep_marks
-        )
-
-    def __call__(self, s: str):
-        s = s.lower()
-        s = re.sub(r"[<\[][^>\]]*[>\]]", "", s)  # remove words between brackets
-        s = re.sub(r"\(([^)]+?)\)", "", s)  # remove words between parenthesis
-        s = self.clean(s).lower()
-
-        # Remove punctuation and extra spaces
-        s = regex.sub(r"[^\w\s]", "", s)
-        s = re.sub(r"\s+", " ", s).strip()
-
-        return s
 
 
 class EnglishNumberNormalizer:

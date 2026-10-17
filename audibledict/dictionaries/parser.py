@@ -1,7 +1,6 @@
 """Extract contextual English entries and examples from dictionary markup."""
 
 import hashlib
-import json
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
@@ -61,6 +60,29 @@ def plain_text(node: ET.Element, omit_labels: bool = False) -> str:
     return WHITESPACE.sub(" ", "".join(parts))
 
 
+def typeset_spelling(node: ET.Element, headword: str) -> str:
+    """Recover a searchable spelling from a WISDOM derivative or compound.
+
+    Args:
+        node (ET.Element): Word element, including stress markup.
+        headword (str): Word substituted for the dictionary's repetition mark.
+
+    Returns:
+        str: Spelling without pronunciation, stress, or syllable separators.
+    """
+    text = (node.text or "") + "".join(
+        ("" if "pr" in child.attrib.get("class", "").split() else plain_text(child))
+        + (child.tail or "")
+        for child in node
+    )
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    text = text.translate(str.maketrans("", "", "・·ˈˌ"))
+    for mark in ("~", "〜"):
+        text = text.replace(mark, headword)
+    return normalized(text)
+
+
 def parse_entry(
     source: str, root: ET.Element
 ) -> tuple[dict, list[dict], set[str]] | None:
@@ -82,22 +104,18 @@ def parse_entry(
     entry_id = source + ":" + source_id
     parent = {child: node for node in root.iter() for child in node}
     examples = []
-    pronunciations = []
     aliases = {normalized(headword)}
     for node in root.iter():
         classes = node.attrib.get("class", "").split()
-        if set(classes) & {"hw", "hv", "subhw", "l", "f", "frm"}:
-            alias = normalized(node.attrib.get("normalized", plain_text(node).strip()))
+        if set(classes) & {"hw", "hv", "subhw", "l", "f", "frm", "drv", "cw"}:
+            alias = (
+                typeset_spelling(node, headword)
+                if set(classes) & {"drv", "cw"}
+                else normalized(node.attrib.get("normalized", plain_text(node).strip()))
+            )
             if alias and not JAPANESE.search(alias):
                 aliases.add(alias)
-        if "ph" in classes:
-            pronunciations.append(
-                {
-                    "text": plain_text(node).strip(),
-                    "label": node.attrib.get(namespace + "pr", ""),
-                    "sound_file": node.attrib.get("soundFile", ""),
-                }
-            )
+                node.set("data-search-term", alias)
         if "ex" not in classes:
             continue
         text = plain_text(node, omit_labels=True).strip()
@@ -108,21 +126,13 @@ def parse_entry(
         while ancestor is not root and "id" not in ancestor.attrib:
             ancestor = parent[ancestor]
         sense_id = ancestor.attrib["id"]
-        definitions = [
-            plain_text(child).strip()
-            for child in ancestor.iter()
-            if namespace + "def" in child.attrib
-            or "df" in child.attrib.get("class", "").split()
-        ]
         audio_id = content_id("example", source, source_id, sense_id, text)
         node.set("data-audio-id", audio_id)
         examples.append(
             {
                 "id": audio_id,
                 "entry_id": entry_id,
-                "sense_id": sense_id,
                 "text": text,
-                "context": " | ".join(dict.fromkeys(definitions)),
                 "needs_review": bool(EDITORIAL.search(text)),
             }
         )
@@ -146,7 +156,6 @@ def parse_entry(
             "search_key": normalized(headword),
             "audio_id": content_id("headword", source, source_id, headword),
             "html": ET.tostring(root, encoding="unicode", method="html"),
-            "pronunciations": json.dumps(pronunciations, ensure_ascii=False),
         },
         examples,
         aliases,

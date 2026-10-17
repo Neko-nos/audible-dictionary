@@ -47,7 +47,6 @@ def test_resume_replays_boundary_job_and_remaining_allocation(
 
 def test_lpt_balances_work_and_assigns_every_record_once() -> None:
     """Balance an uneven invented workload without duplicating or losing jobs."""
-    tokenizer = GemmaTokenizer.from_pretrained("BreezeBlue/Breeze-TTS-2")
     records = [
         {"id": str(index), "text": text}
         for index, text in enumerate(
@@ -61,7 +60,9 @@ def test_lpt_balances_work_and_assigns_every_record_once() -> None:
             ]
         )
     ]
-    lengths = {job["id"]: len(tokenizer.encode(job["text"])) for job in records}
+    lengths = dict(
+        zip((job["id"] for job in records), [2, 6, 11, 4, 2, 3], strict=True)
+    )
     shards = partition_jobs(records, 2, lengths.values())
     assert [sum(lengths[job["id"]] for job in shard) for shard in shards] == [15, 13]
     assert sorted(job["id"] for shard in shards for job in shard) == [

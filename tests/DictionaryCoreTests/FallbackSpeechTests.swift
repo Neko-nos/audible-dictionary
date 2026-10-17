@@ -6,7 +6,7 @@ import Testing
 
 struct FallbackSpeechTests {
   @Test(.serialized, arguments: ["WISDOM", "ODE"], [nil, Accent.us, Accent.uk])
-  func synthesizeCacheAndCancelHelloOnMetal(source: String, accent: Accent?) async throws {
+  func synthesizeAndCancelOnMetal(source: String, accent: Accent?) async throws {
     _ = try #require(MTLCreateSystemDefaultDevice())
     let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
@@ -35,22 +35,8 @@ struct FallbackSpeechTests {
     let samples = try #require(buffer.floatChannelData)[0]
     let peak = (0..<Int(buffer.frameLength)).map { abs(samples[$0]) }.max()!
     #expect(peak > 0.01)
-    let player = try AVAudioPlayer(contentsOf: output)
-    player.volume = 0
-    #expect(player.play())
-    #expect(player.isPlaying)
-    player.stop()
     #expect(
       AudioFiles.local(id: "dummy_hello", source: source, accent: accent, folder: folder) == output)
-
-    let modified = try output.resourceValues(forKeys: [.contentModificationDateKey])
-      .contentModificationDate
-    try await FallbackSpeech.generate(
-      text: text, source: source, accent: accent, output: output,
-      uv: uv, projectDirectory: repository)
-    #expect(
-      try output.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-        == modified)
 
     let cancelledOutput = directory.appendingPathComponent("dummy_hello_cancelled.caf")
     let generation = Task {

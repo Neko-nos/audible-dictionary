@@ -20,15 +20,11 @@ final class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     status = "Stopped"
   }
 
-  func play(id: String, source: String, accent: Accent? = nil, folder: URL, text: String? = nil) {
+  func play(id: String, source: String, accent: Accent? = nil, folder: URL, text: String) {
     stop()
     let label = accent?.label ?? "English"
     if let file = AudioFiles.local(id: id, source: source, accent: accent, folder: folder) {
       play(file: file, label: "\(label) audio")
-      return
-    }
-    guard let text else {
-      status = "No imported \(label) audio."
       return
     }
     guard let uv = Bundle.main.object(forInfoDictionaryKey: "FallbackUV") as? String,
@@ -50,7 +46,8 @@ final class AudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         try Task.checkCancellation()
         generation = nil
         isGenerating = false
-        let file = AudioFiles.local(id: id, source: source, accent: accent, folder: folder) ?? output
+        let file =
+          AudioFiles.local(id: id, source: source, accent: accent, folder: folder) ?? output
         play(file: file, label: "\(label) audio")
       } catch {
         guard !Task.isCancelled else { return }

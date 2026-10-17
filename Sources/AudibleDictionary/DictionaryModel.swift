@@ -6,14 +6,37 @@ import SwiftUI
 final class DictionaryModel: ObservableObject {
   @Published var query = ""
   @Published var source = "All"
-  @Published var selection: String?
+  @Published var selection: EntrySummary.ID?
   @Published var results: [EntrySummary] = []
+  @Published private(set) var isSpellingSuggestion = false
   @Published var entry: Entry?
   @Published var error: String?
   @Published private(set) var library: Library?
+  @Published var textSize = 16.0
+  @Published private var history: [Visit] = []
+  @Published private var historyIndex = -1
   let audio = AudioPlayer()
   let audioFolder = Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent(
     "audio")
+
+  private struct Visit: Equatable {
+    let query: String
+    let source: String
+    let selection: EntrySummary.ID
+  }
+
+  var canGoBack: Bool { historyIndex > 0 }
+  var canGoForward: Bool { historyIndex + 1 < history.count }
+
+  func navigate(_ offset: Int) {
+    let index = historyIndex + offset
+    guard history.indices.contains(index) else { return }
+    historyIndex = index
+    let visit = history[index]
+    query = visit.query
+    source = visit.source
+    selection = visit.selection
+  }
 
   init() {
     if let saved = UserDefaults.standard.string(forKey: "libraryFolder") {
@@ -50,6 +73,9 @@ final class DictionaryModel: ObservableObject {
       entry = nil
       selection = nil
       results = []
+      isSpellingSuggestion = false
+      history = []
+      historyIndex = -1
       error = nil
       UserDefaults.standard.set(url.path, forKey: "libraryFolder")
       Task { await search() }
@@ -64,7 +90,11 @@ final class DictionaryModel: ObservableObject {
       let matches = try await library.search(currentQuery, source: currentSource)
       if Task.isCancelled || currentQuery != query || currentSource != source { return }
       results = matches
+      let term = Library.normalized(currentQuery)
+      isSpellingSuggestion =
+        !matches.isEmpty && !matches.contains { $0.matchedTerm.hasPrefix(term) }
       if !matches.contains(where: { $0.id == selection }) { selection = matches.first?.id }
+      if entry?.summary.entryID == selection?.entryID { recordVisit() }
       error = nil
     } catch { self.error = error.localizedDescription }
   }
@@ -74,10 +104,20 @@ final class DictionaryModel: ObservableObject {
     entry = nil
     guard let selection, let library else { return }
     do {
-      let loaded = try await library.entry(selection)
+      let loaded = try await library.entry(selection.entryID)
       if Task.isCancelled || selection != self.selection { return }
       entry = loaded
+      if loaded != nil { recordVisit() }
     } catch { self.error = error.localizedDescription }
+  }
+
+  private func recordVisit() {
+    guard let selection else { return }
+    let visit = Visit(query: query, source: source, selection: selection)
+    if !history.indices.contains(historyIndex) || history[historyIndex] != visit {
+      history = Array(history.prefix(historyIndex + 1)) + [visit]
+      historyIndex = history.count - 1
+    }
   }
 
   func follow(_ address: String) {
@@ -88,7 +128,10 @@ final class DictionaryModel: ObservableObject {
       Task {
         do {
           if let match = try await library?.reference(sourceID, source: entry.summary.source) {
-            if !results.contains(match) { results.insert(match, at: 0) }
+            // Keep the linked entry selectable while the new query refreshes.
+            if !results.contains(where: { $0.id == match.id }) { results.insert(match, at: 0) }
+            query = match.headword
+            source = match.source
             selection = match.id
           } else {
             error = "That cross-reference is not available in the imported English entries."
@@ -106,5 +149,12 @@ final class DictionaryModel: ObservableObject {
     }
     audio.play(
       id: example.id, source: entry.summary.source, folder: audioFolder, text: example.text)
+  }
+
+  func playHeadword(_ accent: Accent) {
+    guard let entry else { return }
+    audio.play(
+      id: entry.summary.audioID, source: entry.summary.source, accent: accent,
+      folder: audioFolder, text: entry.summary.headword)
   }
 }

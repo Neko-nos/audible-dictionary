@@ -8,8 +8,6 @@ public enum FallbackSpeech {
     async throws
   {
     try Task.checkCancellation()
-    if FileManager.default.fileExists(atPath: output.path) { return }
-
     let process = Process()
     let input = Pipe()
     let errors = Pipe()
@@ -28,29 +26,33 @@ public enum FallbackSpeech {
     process.standardInput = input
     process.standardOutput = FileHandle.nullDevice
     process.standardError = errors
-    try process.run()
-
+    let generation = Task.detached {
+      try Task.checkCancellation()
+      // Foundation's process wait uses a run loop, so launch and wait on the same thread.
+      try process.run()
+      defer {
+        if process.isRunning { process.terminate() }
+      }
+      try Task.checkCancellation()
+      try input.fileHandleForWriting.write(contentsOf: Data(text.utf8))
+      try input.fileHandleForWriting.close()
+      let diagnostics = errors.fileHandleForReading.readDataToEndOfFile()
+      process.waitUntilExit()
+      if process.terminationStatus != 0 {
+        let message = String(decoding: diagnostics, as: UTF8.self)
+          .trimmingCharacters(in: .whitespacesAndNewlines)
+        throw NSError(
+          domain: "FallbackSpeech", code: Int(process.terminationStatus),
+          userInfo: [
+            NSLocalizedDescriptionKey: message.isEmpty ? "Speech generation failed." : message
+          ])
+      }
+    }
     do {
       try await withTaskCancellationHandler {
-        try await Task.detached {
-          defer {
-            if process.isRunning { process.terminate() }
-          }
-          try input.fileHandleForWriting.write(contentsOf: Data(text.utf8))
-          try input.fileHandleForWriting.close()
-          let diagnostics = errors.fileHandleForReading.readDataToEndOfFile()
-          process.waitUntilExit()
-          if process.terminationStatus != 0 {
-            let message = String(decoding: diagnostics, as: UTF8.self)
-              .trimmingCharacters(in: .whitespacesAndNewlines)
-            throw NSError(
-              domain: "FallbackSpeech", code: Int(process.terminationStatus),
-              userInfo: [
-                NSLocalizedDescriptionKey: message.isEmpty ? "Speech generation failed." : message
-              ])
-          }
-        }.value
+        try await generation.value
       } onCancel: {
+        generation.cancel()
         if process.isRunning { process.terminate() }
       }
     } catch {

@@ -17,7 +17,6 @@ dependencies = [
 tts = [
     "huggingface-hub>=1.31.0",
     "jiwer>=4.0.0",
-    "regex>=2026.9.29",
     "transformers>=5.13.0,<5.15",
     "vllm[audio]>=0.30.0,<0.31; sys_platform == 'linux'",
     "vllm-omni>=0.30.0,<0.31; sys_platform == 'linux'",
@@ -25,7 +24,7 @@ tts = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=9.1.1", "ruff>=0.16.7"]
+dev = ["jiwer>=4.0.0", "pytest>=9.1.1", "ruff>=0.16.7"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
