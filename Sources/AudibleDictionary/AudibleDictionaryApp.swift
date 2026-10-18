@@ -40,6 +40,8 @@ private struct DictionaryView: View {
         .toolbar(removing: .sidebarToggle)
     } detail: {
       GeometryReader { geometry in
+        // Reserve room for history, title, and text-size controls so search stays visible.
+        let searchWidth = min(340, max(120, geometry.size.width - 360))
         VStack(spacing: 0) {
           dictionaryTabs
           Divider()
@@ -105,8 +107,9 @@ private struct DictionaryView: View {
           }
           ToolbarItem(placement: .primaryAction) {
             DictionarySearchField(query: $model.query)
-              // Reserve room for history, title, and text-size controls so search stays visible.
-              .frame(width: min(340, max(120, geometry.size.width - 360)))
+              .frame(width: searchWidth)
+              // AppKit otherwise retains the launch width when restoring a narrower window.
+              .id(searchWidth)
           }
         }
       }
