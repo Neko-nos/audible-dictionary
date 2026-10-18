@@ -91,19 +91,10 @@ private struct DictionaryView: View {
             }
             .help("Forward").disabled(!model.canGoForward)
           }
-          ToolbarItemGroup(placement: .primaryAction) {
-            Button {
-              model.textSize -= 1
-            } label: {
-              Text("A").font(.system(size: 9))
-            }
-            .help("Make text smaller").disabled(model.textSize <= 12)
-            Button {
-              model.textSize += 1
-            } label: {
-              Text("A").font(.system(size: 16))
-            }
-            .help("Make text larger").disabled(model.textSize >= 30)
+          ToolbarItem(placement: .primaryAction) {
+            DictionaryTextSizeControl(textSize: $model.textSize)
+              // Keep the joined control clear of the search field's focus ring.
+              .padding(.trailing, 12)
           }
           ToolbarItem(placement: .primaryAction) {
             DictionarySearchField(query: $model.query)
