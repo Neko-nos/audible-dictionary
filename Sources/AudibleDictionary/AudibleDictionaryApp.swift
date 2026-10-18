@@ -119,7 +119,7 @@ private struct DictionaryView: View {
   private var dictionaryTabs: some View {
     HStack(spacing: 8) {
       dictionaryTab("All", source: "All")
-      dictionaryTab("Japanese – English", source: "WISDOM")
+      dictionaryTab("English – Japanese", source: "WISDOM")
       dictionaryTab("British English", source: "ODE")
       Spacer()
     }
@@ -176,7 +176,7 @@ private struct DictionaryView: View {
           VStack(alignment: .leading, spacing: 3) {
             Text(item.title).lineLimit(2)
             if model.source == "All" {
-              Text(item.source == "WISDOM" ? "Japanese – English" : "British English")
+              Text(item.source == "WISDOM" ? "English – Japanese" : "British English")
                 .font(.caption).foregroundStyle(.secondary)
             }
           }.padding(.vertical, 3).tag(item.id)
