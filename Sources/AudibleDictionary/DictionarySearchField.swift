@@ -7,8 +7,9 @@ struct DictionarySearchField: NSViewRepresentable {
   func makeCoordinator() -> Coordinator { Coordinator(query: $query) }
 
   func makeNSView(context: Context) -> NSSearchField {
-    let field = NSSearchField()
+    let field = InitiallyFocusedSearchField()
     field.placeholderString = "Search"
+    field.cell?.isScrollable = true
     field.delegate = context.coordinator
     field.setAccessibilityLabel("Search dictionary")
     return field
@@ -28,6 +29,16 @@ struct DictionarySearchField: NSViewRepresentable {
       if let field = notification.object as? NSSearchField {
         query.wrappedValue = field.stringValue
       }
+    }
+  }
+}
+
+private final class InitiallyFocusedSearchField: NSSearchField {
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    // The toolbar must lay out the field before AppKit creates its editor.
+    DispatchQueue.main.async { [weak self] in
+      self?.window?.makeFirstResponder(self)
     }
   }
 }

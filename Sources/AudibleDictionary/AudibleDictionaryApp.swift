@@ -40,6 +40,8 @@ private struct DictionaryView: View {
         .toolbar(removing: .sidebarToggle)
     } detail: {
       GeometryReader { geometry in
+        // Reserve room for history, title, and text-size controls so search stays visible.
+        let searchWidth = min(340, max(120, geometry.size.width - 360))
         VStack(spacing: 0) {
           dictionaryTabs
           Divider()
@@ -89,24 +91,16 @@ private struct DictionaryView: View {
             }
             .help("Forward").disabled(!model.canGoForward)
           }
-          ToolbarItemGroup(placement: .primaryAction) {
-            Button {
-              model.textSize -= 1
-            } label: {
-              Text("A").font(.system(size: 9))
-            }
-            .help("Make text smaller").disabled(model.textSize <= 12)
-            Button {
-              model.textSize += 1
-            } label: {
-              Text("A").font(.system(size: 16))
-            }
-            .help("Make text larger").disabled(model.textSize >= 30)
+          ToolbarItem(placement: .primaryAction) {
+            DictionaryTextSizeControl(textSize: $model.textSize)
+              // Keep the joined control clear of the search field's focus ring.
+              .padding(.trailing, 12)
           }
           ToolbarItem(placement: .primaryAction) {
             DictionarySearchField(query: $model.query)
-              // Reserve room for history, title, and text-size controls so search stays visible.
-              .frame(width: min(340, max(120, geometry.size.width - 360)))
+              .frame(width: searchWidth)
+              // AppKit otherwise retains the launch width when restoring a narrower window.
+              .id(searchWidth)
           }
         }
       }
@@ -125,7 +119,7 @@ private struct DictionaryView: View {
   private var dictionaryTabs: some View {
     HStack(spacing: 8) {
       dictionaryTab("All", source: "All")
-      dictionaryTab("Japanese – English", source: "WISDOM")
+      dictionaryTab("English – Japanese", source: "WISDOM")
       dictionaryTab("British English", source: "ODE")
       Spacer()
     }
@@ -182,7 +176,7 @@ private struct DictionaryView: View {
           VStack(alignment: .leading, spacing: 3) {
             Text(item.title).lineLimit(2)
             if model.source == "All" {
-              Text(item.source == "WISDOM" ? "Japanese – English" : "British English")
+              Text(item.source == "WISDOM" ? "English – Japanese" : "British English")
                 .font(.caption).foregroundStyle(.secondary)
             }
           }.padding(.vertical, 3).tag(item.id)
