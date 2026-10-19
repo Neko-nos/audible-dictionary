@@ -134,7 +134,7 @@ final class DictionaryModel: ObservableObject {
             source = match.source
             selection = match.id
           } else {
-            error = "That cross-reference is not available in the imported English entries."
+            error = "That cross-reference is not available in the imported entries."
           }
         } catch { self.error = error.localizedDescription }
       }
@@ -152,9 +152,9 @@ final class DictionaryModel: ObservableObject {
   }
 
   func playHeadword(_ accent: Accent) {
-    guard let entry else { return }
+    guard let entry, let audioID = entry.summary.audioID else { return }
     audio.play(
-      id: entry.summary.audioID, source: entry.summary.source, accent: accent,
+      id: audioID, source: entry.summary.source, accent: accent,
       folder: audioFolder, text: entry.summary.headword)
   }
 }

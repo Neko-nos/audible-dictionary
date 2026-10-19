@@ -86,6 +86,48 @@ struct LibraryTests {
     #expect(reference?.id == results.first?.id)
   }
 
+  @Test func japaneseSearchAndCrossReferences() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let database = try DatabaseQueue(path: folder.appendingPathComponent("dictionary.sqlite").path)
+    let sql = """
+      CREATE TABLE dictionaries(source TEXT,css TEXT,resource_path TEXT);
+      INSERT INTO dictionaries VALUES('WISDOM','','/tmp'),('WISDOM_JE','','/tmp'),('ODE','','/tmp');
+      CREATE TABLE entries(id TEXT,source TEXT,source_id TEXT,headword TEXT,search_key TEXT,audio_id TEXT,html TEXT);
+      INSERT INTO entries VALUES
+        ('en','WISDOM','WDEJ_dummy','lumifern','lumifern','audio_en',''),
+        ('ja','WISDOM_JE','WDJE00dummy','るみぐさ【瑠光草】','るみぐさ【瑠光草】',NULL,'<p>lumifern</p>'),
+        ('ode','ODE','WDJE00dummy','lumifern','lumifern','audio_ode','');
+      CREATE TABLE aliases(term TEXT,entry_id TEXT,PRIMARY KEY(term,entry_id));
+      INSERT INTO aliases VALUES('lumifern','en'),('るみぐさ【瑠光草】','ja'),('るみぐさ','ja'),
+        ('瑠光草','ja'),('瑠輝草','ja'),('ルミグサ雲','ja');
+      CREATE TABLE examples(id TEXT,entry_id TEXT,text TEXT,needs_review INTEGER);
+      """
+    try await database.write { db in try db.execute(sql: sql) }
+    let library = try Library(folder: folder)
+    for query in ["るみぐさ", "るみく\u{3099}さ", "瑠光草", "瑠輝草", "ﾙﾐｸﾞｻ"] {
+      let matches = try await library.search(query, source: "WISDOM_JE")
+      #expect(!matches.isEmpty)
+      #expect(matches.allSatisfy { $0.entryID == "ja" })
+      #expect(matches.allSatisfy { $0.dictionaryTitle == "Japanese – English" })
+    }
+    let all = try await library.search("瑠光", source: "All")
+    #expect(all.map(\.entryID) == ["ja"])
+    let englishOnly = try await library.search("瑠光", source: "WISDOM")
+    #expect(englishOnly.isEmpty)
+    let entry = try #require(try await library.entry("ja"))
+    #expect(entry.summary.audioID == nil)
+    #expect(entry.html == "<p>lumifern</p>")
+    for source in ["WISDOM", "WISDOM_JE"] {
+      let japanese = try await library.reference("WDJE00dummy", source: source)
+      #expect(japanese?.entryID == "ja")
+      let english = try await library.reference("WDEJ_dummy", source: source)
+      #expect(english?.entryID == "en")
+    }
+    let oxford = try await library.reference("WDJE00dummy", source: "ODE")
+    #expect(oxford?.entryID == "ode")
+  }
+
   @Test(arguments: [(nil, "ODE"), (Accent.us, "ODE/us"), (Accent.uk, "ODE/uk")])
   func audioFilesRespectDictionaryAccentAndPriority(accent: Accent?, directory: String) throws {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

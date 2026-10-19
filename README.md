@@ -1,7 +1,8 @@
 # Audible Dictionary
 
-A macOS app for looking up English words in **WISDOM English–Japanese** and
-**Oxford Dictionary of English (ODE)**, with spoken pronunciations and examples.
+A macOS app for looking up English and Japanese words in **WISDOM English–Japanese
+and Japanese–English** and **Oxford Dictionary of English (ODE)**, with spoken
+pronunciations and examples in the English dictionaries.
 
 ## Setup
 

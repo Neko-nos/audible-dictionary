@@ -35,20 +35,15 @@ def import_library(bundles: dict[str, Path], output: Path) -> None:
         """)
         for source, bundle in sorted(bundles.items()):
             resources = bundle / "Contents/Resources"
-            db.execute(
+            sources = ("WISDOM", "WISDOM_JE") if source == "WISDOM" else (source,)
+            css = (resources / "DefaultStyle.css").read_text()
+            db.executemany(
                 "INSERT INTO dictionaries VALUES (?, ?, ?)",
-                (
-                    source,
-                    str(resources),
-                    (resources / "DefaultStyle.css").read_text(),
-                ),
+                ((name, str(resources), css) for name in sources),
             )
-            count = 0
+            counts = dict.fromkeys(sources, 0)
             for root in entries(resources / "Body.data"):
-                parsed = parse_entry(source, root)
-                if parsed is None:
-                    continue
-                entry, examples, aliases = parsed
+                entry, examples, aliases = parse_entry(source, root)
                 db.execute(
                     "INSERT INTO entries VALUES (:id,:source,:source_id,:headword,:search_key,:audio_id,:html)",
                     entry,
@@ -61,7 +56,8 @@ def import_library(bundles: dict[str, Path], output: Path) -> None:
                     "INSERT INTO aliases VALUES (?, ?)",
                     ((term, entry["id"]) for term in aliases),
                 )
-                count += 1
-            print(f"{source}: imported {count:,} English entries", flush=True)
+                counts[entry["source"]] += 1
+            for name, count in counts.items():
+                print(f"{name}: imported {count:,} entries", flush=True)
     db.close()
     pending.replace(output / "dictionary.sqlite")

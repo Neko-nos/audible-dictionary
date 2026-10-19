@@ -5,7 +5,7 @@ public struct EntrySummary: Decodable, FetchableRecord, Identifiable, Sendable {
   public let entryID: String
   public let source: String
   public let headword: String
-  public let audioID: String
+  public let audioID: String?
   public let matchedTerm: String
 
   public struct ID: Hashable, Sendable {
@@ -17,6 +17,14 @@ public struct EntrySummary: Decodable, FetchableRecord, Identifiable, Sendable {
 
   public var title: String {
     matchedTerm == Library.normalized(headword) ? headword : matchedTerm
+  }
+
+  public var dictionaryTitle: String {
+    switch source {
+    case "WISDOM": "English – Japanese"
+    case "WISDOM_JE": "Japanese – English"
+    default: "British English"
+    }
   }
 }
 
@@ -149,9 +157,10 @@ public actor Library {
         sql:
           """
           SELECT id AS entryID,source,headword,audio_id AS audioID,search_key AS matchedTerm
-          FROM entries WHERE source_id=? AND source=?
+          FROM entries WHERE source_id=? AND
+              (source=? OR (source IN ('WISDOM', 'WISDOM_JE') AND ? IN ('WISDOM', 'WISDOM_JE')))
           """,
-        arguments: [sourceID, source])
+        arguments: [sourceID, source, source])
     }
   }
 }

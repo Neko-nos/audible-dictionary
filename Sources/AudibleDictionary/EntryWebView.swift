@@ -75,7 +75,7 @@ struct EntryWebView: NSViewRepresentable {
         }
       }
       const heading = document.querySelector('.entry > .hwg, .entry > .hg, .entry > .hw');
-      if (heading) {
+      if (heading && \(entry.summary.audioID != nil)) {
         const controls = document.createElement('span');
         controls.className = 'headword-audio';
         ['us', 'uk'].forEach(accent => {
