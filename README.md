@@ -1,7 +1,8 @@
 # Audible Dictionary
 
-A macOS app for looking up English words in **WISDOM English–Japanese** and
-**Oxford Dictionary of English (ODE)**, with spoken pronunciations and examples.
+A macOS app for looking up English and Japanese words in **WISDOM English–Japanese
+and Japanese–English** and **Oxford Dictionary of English (ODE)**, with spoken
+pronunciations and examples in the English dictionaries.
 
 ## Setup
 
@@ -17,6 +18,7 @@ Open **`build/Audible Dictionary.app`**.
 ## Use
 
 - Search for a word, then click **US/UK** or an English example to hear it.
+- Drag a dictionary tab onto another tab to reorder them. Your order is saved automatically.
 - Use **File → Open Library…** (⌘O) to choose another dictionary library.
 
 Missing recordings are generated on your Mac when clicked and saved for later use.

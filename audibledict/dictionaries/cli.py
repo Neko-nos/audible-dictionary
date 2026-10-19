@@ -1,4 +1,4 @@
-"""Import installed English dictionaries and export audio jobs as a script."""
+"""Import installed WISDOM and ODE dictionaries and export English audio jobs."""
 
 import argparse
 from pathlib import Path

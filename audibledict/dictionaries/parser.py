@@ -1,4 +1,4 @@
-"""Extract contextual English entries and examples from dictionary markup."""
+"""Extract searchable entries and English speech from dictionary markup."""
 
 import hashlib
 import re
@@ -83,23 +83,21 @@ def typeset_spelling(node: ET.Element, headword: str) -> str:
     return normalized(text)
 
 
-def parse_entry(
-    source: str, root: ET.Element
-) -> tuple[dict, list[dict], set[str]] | None:
+def parse_entry(source: str, root: ET.Element) -> tuple[dict, list[dict], set[str]]:
     """Preserve an entry and attach contextual identifiers to English examples.
 
     Args:
-        source (str): WISDOM or ODE.
+        source (str): WISDOM (both directions) or ODE.
         root (ET.Element): Original dictionary entry.
 
     Returns:
-        tuple[dict, list[dict], set[str]] | None: Entry, examples and search aliases,
-            or None for the Japanese-to-English half of WISDOM.
+        tuple[dict, list[dict], set[str]]: Entry, English speech and search aliases.
     """
     namespace = "{http://www.apple.com/DTDs/DictionaryService-1.0.rng}"
     source_id = root.attrib["id"]
-    if source == "WISDOM" and not source_id.startswith("WDEJ_"):
-        return None
+    if source == "WISDOM" and source_id.startswith("WDJE"):
+        source = "WISDOM_JE"
+    japanese = source == "WISDOM_JE"
     headword = root.attrib[namespace + "title"]
     entry_id = source + ":" + source_id
     parent = {child: node for node in root.iter() for child in node}
@@ -110,13 +108,13 @@ def parse_entry(
         if set(classes) & {"hw", "hv", "subhw", "l", "f", "frm", "drv", "cw"}:
             alias = (
                 typeset_spelling(node, headword)
-                if set(classes) & {"drv", "cw"}
+                if not japanese and set(classes) & {"drv", "cw"}
                 else normalized(node.attrib.get("normalized", plain_text(node).strip()))
             )
-            if alias and not JAPANESE.search(alias):
+            if alias and (japanese or not JAPANESE.search(alias)):
                 aliases.add(alias)
                 node.set("data-search-term", alias)
-        if "ex" not in classes:
+        if japanese or "ex" not in classes:
             continue
         text = plain_text(node, omit_labels=True).strip()
         # Mixed-language explanations must never be spoken with an English voice.
@@ -154,7 +152,9 @@ def parse_entry(
             "source_id": source_id,
             "headword": headword,
             "search_key": normalized(headword),
-            "audio_id": content_id("headword", source, source_id, headword),
+            "audio_id": None
+            if japanese
+            else content_id("headword", source, source_id, headword),
             "html": ET.tostring(root, encoding="unicode", method="html"),
         },
         examples,

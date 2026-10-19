@@ -43,7 +43,7 @@ private struct DictionaryView: View {
         // Reserve room for history, title, and text-size controls so search stays visible.
         let searchWidth = min(340, max(120, geometry.size.width - 360))
         VStack(spacing: 0) {
-          dictionaryTabs
+          DictionaryTabs(model: model)
           Divider()
           if model.library == nil {
             welcome
@@ -116,39 +116,10 @@ private struct DictionaryView: View {
     }
   }
 
-  private var dictionaryTabs: some View {
-    HStack(spacing: 8) {
-      dictionaryTab("All", source: "All")
-      dictionaryTab("English – Japanese", source: "WISDOM")
-      dictionaryTab("British English", source: "ODE")
-      Spacer()
-    }
-    .padding(.horizontal, 12).padding(.vertical, 8)
-    .background(.bar)
-  }
-
-  private func dictionaryTab(_ title: String, source: String) -> some View {
-    Button {
-      model.source = source
-    } label: {
-      Text(title)
-        .fontWeight(model.source == source ? .medium : .regular)
-        .foregroundStyle(model.source == source ? .primary : .secondary)
-        .padding(.horizontal, 12).padding(.vertical, 4)
-        .background {
-          if model.source == source {
-            RoundedRectangle(cornerRadius: 5).fill(.quaternary)
-          }
-        }
-    }
-    .buttonStyle(.plain)
-    .accessibilityAddTraits(model.source == source ? .isSelected : [])
-  }
-
   private var welcome: some View {
     VStack(spacing: 16) {
       Image(systemName: "book.closed.fill").font(.system(size: 52)).foregroundStyle(.secondary)
-      Text("Your English dictionary, with audio").font(.title)
+      Text("Your English and Japanese dictionaries, with audio").font(.title)
       Text("Open a library imported from your installed WISDOM and ODE dictionaries.")
         .foregroundStyle(.secondary)
       Button("Open Library…", action: model.chooseLibrary).buttonStyle(.borderedProminent)
@@ -176,7 +147,7 @@ private struct DictionaryView: View {
           VStack(alignment: .leading, spacing: 3) {
             Text(item.title).lineLimit(2)
             if model.source == "All" {
-              Text(item.source == "WISDOM" ? "English – Japanese" : "British English")
+              Text(item.dictionaryTitle)
                 .font(.caption).foregroundStyle(.secondary)
             }
           }.padding(.vertical, 3).tag(item.id)

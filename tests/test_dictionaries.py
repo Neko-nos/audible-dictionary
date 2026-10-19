@@ -38,6 +38,29 @@ def dummy_entry(source_id: str = "WDEJ_dummy", title: str = "lumifern") -> bytes
     </d:entry>'''.encode()
 
 
+def dummy_japanese_entry() -> bytes:
+    """Construct an invented Japanese entry with English translations."""
+    return """<d:entry xmlns:d="http://www.apple.com/DTDs/DictionaryService-1.0.rng"
+        id="WDJE00dummy" d:title="るみぐさ【瑠光草】" class="entry" lang="ja">
+        <span class="hwg"><span class="hw">るみぐさ <d:prn/></span>
+          <span class="hvg"><span class="hv">瑠光草</span><span class="hv">瑠輝草</span></span>
+        </span>
+        <span class="gramb" id="WDJE00dummy_sense">
+          <span class="semb"><span class="trg">
+            <span class="trans ty_訳語">lumifern</span>
+          </span></span>
+          <span class="exg"><span class="ex">架空の瑠光草が光る。</span>
+            <span class="trg"><span class="trans ty_訳文">The lumi<span class="italic">fern</span> glows softly.</span></span>
+            <span class="trg"><span class="trans ty_訳文">A [<span class="oup_label">｟架空｠ </span>the] lumifern glows.</span></span>
+          </span>
+          <span class="trans">架空の説明</span>
+        </span>
+        <span class="csec"><span class="cwg"><span class="cw">ルミグサ雲</span></span></span>
+        <span class="drvsec"><span class="drv">るみぐさめく</span></span>
+        <a href="x-dictionary:r:WDEJ_dummy">lumifern</a>
+    </d:entry>""".encode()
+
+
 def write_bundle(folder: Path, source: str, records: list[bytes]) -> Path:
     """Write actual zlib blocks and a plist using entirely invented entries."""
     bundle = folder / f"{source}.dictionary"
@@ -87,17 +110,39 @@ def test_example_text_and_identity() -> None:
     assert 'data-search-term="lumifern sprig"' in entry["html"]
 
 
+def test_japanese_search_aliases() -> None:
+    entry, _, aliases = parse_entry("WISDOM", ET.fromstring(dummy_japanese_entry()))
+    assert entry["source"] == "WISDOM_JE"
+    assert entry["id"] == "WISDOM_JE:WDJE00dummy"
+    assert entry["headword"] == "るみぐさ【瑠光草】"
+    assert entry["audio_id"] is None
+    assert aliases == {
+        "るみぐさ【瑠光草】",
+        "るみぐさ",
+        "瑠光草",
+        "瑠輝草",
+        "ルミグサ雲",
+        "るみぐさめく",
+    }
+    assert 'data-search-term="ルミグサ雲"' in entry["html"]
+
+
 def test_binary_import_and_both_export_kinds(tmp_path: Path) -> None:
     bundles = tmp_path / "bundles"
-    wisdom = write_bundle(
-        bundles, "WISDOM", [dummy_entry(), dummy_entry("WDJE_dummy", "架空語")]
-    )
+    wisdom = write_bundle(bundles, "WISDOM", [dummy_entry(), dummy_japanese_entry()])
     write_bundle(bundles, "ODE", [dummy_entry("m_dummy")])
     assert len(list(entries(wisdom / "Contents/Resources/Body.data"))) == 2
     library = tmp_path / "Library"
     import_library(discover([bundles]), library)
     with sqlite3.connect(library / "dictionary.sqlite") as db:
-        assert db.execute("SELECT COUNT(*) FROM entries").fetchone()[0] == 2
+        assert db.execute(
+            "SELECT source, COUNT(*) FROM entries GROUP BY source ORDER BY source"
+        ).fetchall() == [("ODE", 1), ("WISDOM", 1), ("WISDOM_JE", 1)]
+        assert db.execute(
+            "SELECT entry_id FROM aliases WHERE term=?", ("瑠光草",)
+        ).fetchall() == [("WISDOM_JE:WDJE00dummy",)]
+        resources = dict(db.execute("SELECT source, resource_path FROM dictionaries"))
+        assert resources["WISDOM"] == resources["WISDOM_JE"]
         assert db.execute(
             "SELECT entry_id FROM aliases WHERE term=? ORDER BY entry_id",
             ("lumifernability",),

@@ -36,7 +36,8 @@ def export_audio(
                              FROM examples x JOIN entries e ON e.id=x.entry_id ORDER BY x.id""")
     else:
         rows = db.execute("""SELECT audio_id AS id, headword AS text, source
-                             FROM entries WHERE trim(headword) <> '' ORDER BY audio_id""")
+                             FROM entries WHERE audio_id IS NOT NULL AND trim(headword) <> ''
+                             ORDER BY audio_id""")
     output.parent.mkdir(parents=True, exist_ok=True)
     count = 0
     with output.open("w", encoding="utf-8") as stream:
