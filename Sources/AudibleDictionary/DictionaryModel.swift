@@ -6,6 +6,7 @@ import SwiftUI
 final class DictionaryModel: ObservableObject {
   @Published var query = ""
   @Published var source = "All"
+  @Published private(set) var dictionaryOrder = ["All", "WISDOM", "WISDOM_JE", "ODE"]
   @Published var selection: EntrySummary.ID?
   @Published var results: [EntrySummary] = []
   @Published private(set) var isSpellingSuggestion = false
@@ -39,6 +40,11 @@ final class DictionaryModel: ObservableObject {
   }
 
   init() {
+    if let saved = UserDefaults.standard.stringArray(forKey: "dictionaryOrder") {
+      dictionaryOrder.sort {
+        (saved.firstIndex(of: $0) ?? saved.count) < (saved.firstIndex(of: $1) ?? saved.count)
+      }
+    }
     if let saved = UserDefaults.standard.string(forKey: "libraryFolder") {
       open(URL(fileURLWithPath: saved))
     } else {
@@ -50,6 +56,15 @@ final class DictionaryModel: ObservableObject {
         open(adjacent)
       }
     }
+  }
+
+  func moveDictionary(_ source: String, to target: String) -> Bool {
+    guard let from = dictionaryOrder.firstIndex(of: source),
+      let to = dictionaryOrder.firstIndex(of: target), from != to
+    else { return false }
+    dictionaryOrder.move(fromOffsets: IndexSet(integer: from), toOffset: from < to ? to + 1 : to)
+    UserDefaults.standard.set(dictionaryOrder, forKey: "dictionaryOrder")
+    return true
   }
 
   func chooseLibrary() {

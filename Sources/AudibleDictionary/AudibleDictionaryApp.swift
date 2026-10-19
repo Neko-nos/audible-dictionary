@@ -43,7 +43,7 @@ private struct DictionaryView: View {
         // Reserve room for history, title, and text-size controls so search stays visible.
         let searchWidth = min(340, max(120, geometry.size.width - 360))
         VStack(spacing: 0) {
-          dictionaryTabs
+          DictionaryTabs(model: model)
           Divider()
           if model.library == nil {
             welcome
@@ -114,36 +114,6 @@ private struct DictionaryView: View {
       _ in
       audio.stop()
     }
-  }
-
-  private var dictionaryTabs: some View {
-    HStack(spacing: 8) {
-      dictionaryTab("All", source: "All")
-      dictionaryTab("English – Japanese", source: "WISDOM")
-      dictionaryTab("Japanese – English", source: "WISDOM_JE")
-      dictionaryTab("British English", source: "ODE")
-      Spacer()
-    }
-    .padding(.horizontal, 12).padding(.vertical, 8)
-    .background(.bar)
-  }
-
-  private func dictionaryTab(_ title: String, source: String) -> some View {
-    Button {
-      model.source = source
-    } label: {
-      Text(title)
-        .fontWeight(model.source == source ? .medium : .regular)
-        .foregroundStyle(model.source == source ? .primary : .secondary)
-        .padding(.horizontal, 12).padding(.vertical, 4)
-        .background {
-          if model.source == source {
-            RoundedRectangle(cornerRadius: 5).fill(.quaternary)
-          }
-        }
-    }
-    .buttonStyle(.plain)
-    .accessibilityAddTraits(model.source == source ? .isSelected : [])
   }
 
   private var welcome: some View {

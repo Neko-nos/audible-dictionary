@@ -18,6 +18,7 @@ Open **`build/Audible Dictionary.app`**.
 ## Use
 
 - Search for a word, then click **US/UK** or an English example to hear it.
+- Drag a dictionary tab onto another tab to reorder them. Your order is saved automatically.
 - Use **File → Open Library…** (⌘O) to choose another dictionary library.
 
 Missing recordings are generated on your Mac when clicked and saved for later use.
