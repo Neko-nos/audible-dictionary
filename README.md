@@ -17,7 +17,10 @@ Open **`build/Audible Dictionary.app`**.
 
 ## Use
 
-- Search for a word, then click **US/UK** or an English example to hear it.
+- Search for a word, then click **US/UK** or the **▶** beside an English example to hear it.
+- Hover over a word or phrase in a definition to underline it, then click once to look it up.
+  Recognized idioms open at their highlighted section.
+  Looking up English or Japanese text switches between the two WISDOM directions as needed.
 - Drag a dictionary tab onto another tab to reorder them. Your order is saved automatically.
 - Use **File → Open Library…** (⌘O) to choose another dictionary library.
 

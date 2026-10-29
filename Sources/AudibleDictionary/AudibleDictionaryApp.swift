@@ -29,7 +29,7 @@ struct AudibleDictionaryApp: App {
   }
 }
 
-private struct DictionaryView: View {
+struct DictionaryView: View {
   @ObservedObject var model: DictionaryModel
   @ObservedObject var audio: AudioPlayer
 
@@ -161,8 +161,13 @@ private struct DictionaryView: View {
     if let entry = model.entry {
       EntryWebView(
         entry: entry, audioFolder: model.audioFolder,
-        textSize: model.textSize, matchedTerm: model.selection?.matchedTerm,
-        play: model.playExample, playHeadword: model.playHeadword, follow: model.follow)
+        textSize: model.textSize, selection: model.selection,
+        anchor: model.anchor,
+        play: model.playExample, playHeadword: model.playHeadword,
+        follow: { link in Task { await model.follow(link) } },
+        lookup: { text, offset in
+          try await model.library?.lookup(text, at: offset, source: model.source)
+        })
     } else {
       VStack(spacing: 12) {
         Image(systemName: "text.book.closed").font(.system(size: 40)).foregroundStyle(.tertiary)
