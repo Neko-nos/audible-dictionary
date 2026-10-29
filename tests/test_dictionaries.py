@@ -24,6 +24,10 @@ def dummy_entry(source_id: str = "WDEJ_dummy", title: str = "lumifern") -> bytes
         <span class="csec"><span class="cwg"><span class="cw"><span class="str"><span class="rf">～̀</span></span> spr<span class="str">í</span>g </span></span>
           <span class="trans">架空の小枝</span>
         </span>
+        <span class="idmsec" id="{source_id}_idiom">
+          <span class="idm">under the (p<span class="str">á</span>le) lumifern [glow]</span>
+          <span class="trans">架空の成句</span>
+        </span>
         <span class="semb" id="{source_id}_sense">
           <span d:def="1" class="trans">架空の光る植物</span>
           <span class="ex">The lumi<span class="italic">fern</span> glows softly.</span>
@@ -106,8 +110,16 @@ def test_example_text_and_identity() -> None:
     assert "lumifernability" in aliases
     assert "lumifernly" in aliases
     assert "lumifern sprig" in aliases
-    assert 'data-search-term="lumifernability"' in entry["html"]
-    assert 'data-search-term="lumifern sprig"' in entry["html"]
+    assert {"under the lumifern", "under the pale lumifern"} <= aliases
+    markup = ET.fromstring(entry["html"])
+    for class_name, term in [("drv", "lumifernability"), ("cw", "lumifern sprig")]:
+        node = markup.find(f".//span[@class='{class_name}']")
+        assert json.loads(node.attrib["data-search-terms"]) == [term]
+    idiom = markup.find(".//span[@class='idm']")
+    assert json.loads(idiom.attrib["data-search-terms"]) == [
+        "under the lumifern",
+        "under the pale lumifern",
+    ]
 
 
 def test_japanese_search_aliases() -> None:
@@ -124,7 +136,9 @@ def test_japanese_search_aliases() -> None:
         "ルミグサ雲",
         "るみぐさめく",
     }
-    assert 'data-search-term="ルミグサ雲"' in entry["html"]
+    markup = ET.fromstring(entry["html"])
+    compound = markup.find(".//span[@class='cw']")
+    assert json.loads(compound.attrib["data-search-terms"]) == ["ルミグサ雲"]
 
 
 def test_binary_import_and_both_export_kinds(tmp_path: Path) -> None:
@@ -147,6 +161,10 @@ def test_binary_import_and_both_export_kinds(tmp_path: Path) -> None:
             "SELECT entry_id FROM aliases WHERE term=? ORDER BY entry_id",
             ("lumifernability",),
         ).fetchall() == [("ODE:m_dummy",), ("WISDOM:WDEJ_dummy",)]
+        assert db.execute(
+            "SELECT term FROM aliases WHERE entry_id=? AND term LIKE ? ORDER BY term",
+            ("WISDOM:WDEJ_dummy", "under%"),
+        ).fetchall() == [("under the lumifern",), ("under the pale lumifern",)]
         assert db.execute(
             "SELECT term FROM aliases WHERE entry_id=? AND term LIKE ? ORDER BY term",
             ("WISDOM:WDEJ_dummy", "lumifern%"),

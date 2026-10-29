@@ -1,6 +1,7 @@
 """Extract searchable entries and English speech from dictionary markup."""
 
 import hashlib
+import json
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
@@ -8,6 +9,8 @@ import xml.etree.ElementTree as ET
 JAPANESE = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uff66-\uff9f]")
 EDITORIAL = re.compile(r"[\[\]/≒…〜～]|\.{3}|_{2,}")
 WHITESPACE = re.compile(r"\s+")
+IDIOM_ALTERNATIVE = re.compile(r"\[[^\[\]]*\]")
+IDIOM_OPTIONAL = re.compile(r"\(([^()]*)\)")
 
 
 def normalized(text: str) -> str:
@@ -105,15 +108,33 @@ def parse_entry(source: str, root: ET.Element) -> tuple[dict, list[dict], set[st
     aliases = {normalized(headword)}
     for node in root.iter():
         classes = node.attrib.get("class", "").split()
-        if set(classes) & {"hw", "hv", "subhw", "l", "f", "frm", "drv", "cw"}:
+        spellings = set()
+        if "idm" in classes and not japanese:
+            spellings = {IDIOM_ALTERNATIVE.sub("", typeset_spelling(node, headword))}
+            while any(IDIOM_OPTIONAL.search(value) for value in spellings):
+                spellings = {
+                    expanded
+                    for value in spellings
+                    for expanded in (
+                        IDIOM_OPTIONAL.sub("", value, count=1),
+                        IDIOM_OPTIONAL.sub(r"\1", value, count=1),
+                    )
+                }
+            spellings = {WHITESPACE.sub(" ", value).strip() for value in spellings}
+        elif set(classes) & {"hw", "hv", "subhw", "l", "f", "frm", "drv", "cw"}:
             alias = (
                 typeset_spelling(node, headword)
                 if not japanese and set(classes) & {"drv", "cw"}
                 else normalized(node.attrib.get("normalized", plain_text(node).strip()))
             )
-            if alias and (japanese or not JAPANESE.search(alias)):
-                aliases.add(alias)
-                node.set("data-search-term", alias)
+            if japanese or not JAPANESE.search(alias):
+                spellings.add(alias)
+        spellings.discard("")
+        if spellings:
+            aliases.update(spellings)
+            node.set(
+                "data-search-terms", json.dumps(sorted(spellings), ensure_ascii=False)
+            )
         if japanese or "ex" not in classes:
             continue
         text = plain_text(node, omit_labels=True).strip()

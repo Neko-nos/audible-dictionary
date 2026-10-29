@@ -84,6 +84,20 @@ struct LibraryTests {
     let reference = try await library.reference("dummy_a", source: "ODE")
     #expect(reference?.entryID == "a")
     #expect(reference?.id == results.first?.id)
+    let context = "架空🌱: a lumifern sprig, glowing softly."
+    let phraseRange = (context as NSString).range(of: "lumifern sprig")
+    for offset in [phraseRange.location, NSMaxRange(phraseRange) - 1] {
+      let phrase = try await library.lookup(context, at: offset, source: "ODE")
+      #expect(phrase?.term == "lumifern sprig")
+      #expect(phrase?.range == phraseRange)
+    }
+    let wordContext = "A LUMIFERN glows."
+    let wordRange = (wordContext as NSString).range(of: "LUMIFERN")
+    let word = try await library.lookup(wordContext, at: wordRange.location, source: "All")
+    #expect(word?.term == "lumifern")
+    #expect(word?.range == wordRange)
+    #expect(try await library.lookup(context, at: phraseRange.location, source: "WISDOM") == nil)
+    #expect(try await library.lookup(context, at: NSMaxRange(phraseRange), source: "All") == nil)
   }
 
   @Test func japaneseSearchAndCrossReferences() async throws {
@@ -115,6 +129,25 @@ struct LibraryTests {
     #expect(all.map(\.entryID) == ["ja"])
     let englishOnly = try await library.search("瑠光", source: "WISDOM")
     #expect(englishOnly.isEmpty)
+    for source in ["WISDOM", "WISDOM_JE", "All"] {
+      for (text, spelling) in [
+        ("🌱架空のるみぐさを眺める。", "るみぐさ"),
+        ("🌱空想の瑠光草を調べる。", "瑠光草"),
+        ("🌱ﾙﾐｸﾞｻ雲が浮かぶ。", "ﾙﾐｸﾞｻ雲"),
+        ("🌱るみく\u{3099}さの話。", "るみく\u{3099}さ"),
+      ] {
+        let range = (text as NSString).range(of: spelling)
+        for offset in [range.location, NSMaxRange(range) - 1] {
+          let match = try await library.lookup(text, at: offset, source: source)
+          #expect(match?.term == Library.normalized(spelling))
+          #expect(match?.range == range)
+          #expect(match?.source == (source == "All" ? "All" : "WISDOM_JE"))
+        }
+      }
+    }
+    let englishLookup = try await library.lookup("The lumifern glows.", at: 5, source: "WISDOM_JE")
+    #expect(englishLookup?.term == "lumifern")
+    #expect(englishLookup?.source == "WISDOM")
     let entry = try #require(try await library.entry("ja"))
     #expect(entry.summary.audioID == nil)
     #expect(entry.html == "<p>lumifern</p>")

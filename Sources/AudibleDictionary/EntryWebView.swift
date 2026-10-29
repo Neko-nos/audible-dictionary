@@ -66,10 +66,10 @@ struct EntryWebView: NSViewRepresentable {
       const review = new Set(\(reviewIDs));
       const match = \(match);
       if (match && match !== \(headword)) {
-        const word = Array.from(document.querySelectorAll('[data-search-term]'))
-          .find(node => node.dataset.searchTerm === match);
+        const word = Array.from(document.querySelectorAll('[data-search-terms]'))
+          .find(node => JSON.parse(node.dataset.searchTerms).includes(match));
         if (word) {
-          const section = word.closest('.drvsec, .csec') || word;
+          const section = word.closest('.drvsec, .csec, .idmsec') || word;
           section.classList.add('lookup-match');
           requestAnimationFrame(() => section.scrollIntoView({block: 'nearest'}));
         }
