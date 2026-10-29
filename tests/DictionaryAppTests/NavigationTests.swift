@@ -128,6 +128,45 @@ struct NavigationTests {
     #expect(model.query == query)
   }
 
+  @Test(arguments: [false, true])
+  func resizingPreservesKeyboardFocus(searchFocused: Bool) async throws {
+    let (model, window) = try makeDictionary()
+    defer { window.close() }
+    try await waitUntil { model.entry?.summary.entryID == "dummy_plant" }
+    let webView = try await loadedWebView(in: window)
+    let frame = try #require(window.contentView?.superview)
+    let search = try #require(findSearchField(frame))
+    let width = webView.frame.width
+    try #require(window.makeFirstResponder(searchFocused ? search : webView))
+    let responder = window.firstResponder
+    if searchFocused {
+      let editor = try #require(search.currentEditor())
+      editor.selectedRange = NSRange(location: 1, length: 1)
+    }
+    window.setContentSize(NSSize(width: 820, height: 620))
+    try await waitUntil { webView.frame.width < width }
+    await withCheckedContinuation { continuation in
+      DispatchQueue.main.async { continuation.resume() }
+    }
+    #expect(window.firstResponder === responder)
+    if searchFocused {
+      #expect(search.currentEditor()?.selectedRange == NSRange(location: 1, length: 1))
+    }
+  }
+
+  @Test(arguments: [780.0, 1050.0])
+  func searchFitsTheInitialWindow(_ width: Double) async throws {
+    let (model, window) = try makeDictionary(width: width)
+    defer { window.close() }
+    try await waitUntil { model.entry?.summary.entryID == "dummy_plant" }
+    _ = try await loadedWebView(in: window)
+    let frame = try #require(window.contentView?.superview)
+    let search = try #require(findSearchField(frame))
+    #expect(!search.isHiddenOrHasHiddenAncestor)
+    #expect(search.frame.width >= 120)
+    #expect(frame.bounds.contains(search.convert(search.bounds, to: frame)))
+  }
+
   @Test func sectionLinksAndHistory() async throws {
     let (model, window) = try makeDictionary()
     defer { window.close() }
@@ -337,6 +376,11 @@ struct NavigationTests {
   private func findWebView(_ view: NSView) -> WKWebView? {
     if let webView = view as? WKWebView { return webView }
     return view.subviews.lazy.compactMap(findWebView).first
+  }
+
+  private func findSearchField(_ view: NSView) -> NSSearchField? {
+    if let field = view as? NSSearchField { return field }
+    return view.subviews.lazy.compactMap(findSearchField).first
   }
 
   private func waitUntil(
