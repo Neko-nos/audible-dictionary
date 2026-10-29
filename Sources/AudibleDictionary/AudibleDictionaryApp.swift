@@ -29,7 +29,7 @@ struct AudibleDictionaryApp: App {
   }
 }
 
-private struct DictionaryView: View {
+struct DictionaryView: View {
   @ObservedObject var model: DictionaryModel
   @ObservedObject var audio: AudioPlayer
 
@@ -39,69 +39,63 @@ private struct DictionaryView: View {
         .navigationSplitViewColumnWidth(min: 140, ideal: 175, max: 280)
         .toolbar(removing: .sidebarToggle)
     } detail: {
-      GeometryReader { geometry in
-        // Reserve room for history, title, and text-size controls so search stays visible.
-        let searchWidth = min(340, max(120, geometry.size.width - 360))
-        VStack(spacing: 0) {
-          DictionaryTabs(model: model)
-          Divider()
-          if model.library == nil {
-            welcome
-          } else {
-            detail
-          }
-          if let error = model.error {
-            HStack {
-              Image(systemName: "exclamationmark.circle")
-              Text(error).textSelection(.enabled)
-              Spacer()
-              Button("Dismiss") { model.error = nil }
-            }.font(.callout).padding(10).background(.orange.opacity(0.12))
-          }
-          if audio.status != "Ready" && audio.status != "Stopped" && audio.status != "Finished" {
-            Divider()
-            HStack {
-              if audio.isGenerating {
-                ProgressView().controlSize(.small)
-              } else {
-                Image(systemName: audio.isPlaying ? "waveform" : "speaker.wave.2")
-              }
-              Text(audio.status).lineLimit(2)
-              Spacer()
-            }.font(.caption).padding(.horizontal, 16).padding(.vertical, 9)
-          }
+      VStack(spacing: 0) {
+        DictionaryTabs(model: model)
+        Divider()
+        if model.library == nil {
+          welcome
+        } else {
+          detail
         }
-        .background(.background)
-        .navigationTitle("Dictionary")
-        .navigationSubtitle(
-          "\(model.results.count == 100 ? "100+" : "\(model.results.count)") \(model.isSpellingSuggestion ? "suggested" : "found")"
-        )
-        .toolbar {
-          ToolbarItemGroup(placement: .navigation) {
-            Button {
-              model.navigate(-1)
-            } label: {
-              Image(systemName: "chevron.left")
+        if let error = model.error {
+          HStack {
+            Image(systemName: "exclamationmark.circle")
+            Text(error).textSelection(.enabled)
+            Spacer()
+            Button("Dismiss") { model.error = nil }
+          }.font(.callout).padding(10).background(.orange.opacity(0.12))
+        }
+        if audio.status != "Ready" && audio.status != "Stopped" && audio.status != "Finished" {
+          Divider()
+          HStack {
+            if audio.isGenerating {
+              ProgressView().controlSize(.small)
+            } else {
+              Image(systemName: audio.isPlaying ? "waveform" : "speaker.wave.2")
             }
-            .help("Back").disabled(!model.canGoBack)
-            Button {
-              model.navigate(1)
-            } label: {
-              Image(systemName: "chevron.right")
-            }
-            .help("Forward").disabled(!model.canGoForward)
+            Text(audio.status).lineLimit(2)
+            Spacer()
+          }.font(.caption).padding(.horizontal, 16).padding(.vertical, 9)
+        }
+      }
+      .background(.background)
+      .navigationTitle("Dictionary")
+      .navigationSubtitle(
+        "\(model.results.count == 100 ? "100+" : "\(model.results.count)") \(model.isSpellingSuggestion ? "suggested" : "found")"
+      )
+      .toolbar {
+        ToolbarItemGroup(placement: .navigation) {
+          Button {
+            model.navigate(-1)
+          } label: {
+            Image(systemName: "chevron.left")
           }
-          ToolbarItem(placement: .primaryAction) {
-            DictionaryTextSizeControl(textSize: $model.textSize)
-              // Keep the joined control clear of the search field's focus ring.
-              .padding(.trailing, 12)
+          .help("Back").disabled(!model.canGoBack)
+          Button {
+            model.navigate(1)
+          } label: {
+            Image(systemName: "chevron.right")
           }
-          ToolbarItem(placement: .primaryAction) {
-            DictionarySearchField(query: $model.query)
-              .frame(width: searchWidth)
-              // AppKit otherwise retains the launch width when restoring a narrower window.
-              .id(searchWidth)
-          }
+          .help("Forward").disabled(!model.canGoForward)
+        }
+        ToolbarItem(placement: .primaryAction) {
+          DictionaryTextSizeControl(textSize: $model.textSize)
+            // Keep the joined control clear of the search field's focus ring.
+            .padding(.trailing, 12)
+        }
+        ToolbarItem(placement: .primaryAction) {
+          DictionarySearchField(query: $model.query)
+            .frame(minWidth: 120, idealWidth: 240, maxWidth: 340)
         }
       }
     }
@@ -161,8 +155,13 @@ private struct DictionaryView: View {
     if let entry = model.entry {
       EntryWebView(
         entry: entry, audioFolder: model.audioFolder,
-        textSize: model.textSize, matchedTerm: model.selection?.matchedTerm,
-        play: model.playExample, playHeadword: model.playHeadword, follow: model.follow)
+        textSize: model.textSize, selection: model.selection,
+        anchor: model.anchor,
+        play: model.playExample, playHeadword: model.playHeadword,
+        follow: { link in Task { await model.follow(link) } },
+        lookup: { text, offset in
+          try await model.library?.lookup(text, at: offset, source: model.source)
+        })
     } else {
       VStack(spacing: 12) {
         Image(systemName: "text.book.closed").font(.system(size: 40)).foregroundStyle(.tertiary)

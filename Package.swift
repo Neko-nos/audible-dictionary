@@ -12,5 +12,9 @@ let package = Package(
       name: "DictionaryCoreTests",
       dependencies: ["DictionaryCore", .product(name: "GRDB", package: "GRDB.swift")],
       path: "tests/DictionaryCoreTests"),
+    .testTarget(
+      name: "DictionaryAppTests",
+      dependencies: ["AudibleDictionary", .product(name: "GRDB", package: "GRDB.swift")],
+      path: "tests/DictionaryAppTests"),
   ]
 )

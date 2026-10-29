@@ -34,11 +34,15 @@ struct DictionarySearchField: NSViewRepresentable {
 }
 
 private final class InitiallyFocusedSearchField: NSSearchField {
+  private var hasFocused = false
+
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
     // The toolbar must lay out the field before AppKit creates its editor.
     DispatchQueue.main.async { [weak self] in
-      self?.window?.makeFirstResponder(self)
+      guard let self, !hasFocused, let window else { return }
+      // AppKit can reattach toolbar views while resizing the window.
+      hasFocused = window.makeFirstResponder(self)
     }
   }
 }

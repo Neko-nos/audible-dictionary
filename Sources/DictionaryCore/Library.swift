@@ -42,16 +42,23 @@ public struct Entry: Sendable {
   public let examples: [Example]
 }
 
+public struct LookupTerm: Sendable {
+  public let term: String
+  public let range: NSRange
+  public let source: String
+}
+
 public actor Library {
   private let database: DatabaseQueue
+  private let maximumTermLength: Int
 
   public init(folder: URL) throws {
     var configuration = Configuration()
     configuration.readonly = true
     database = try DatabaseQueue(
       path: folder.appendingPathComponent("dictionary.sqlite").path, configuration: configuration)
-    _ = try database.read { db in
-      try String.fetchOne(db, sql: "SELECT source FROM dictionaries LIMIT 1")
+    maximumTermLength = try database.read { db in
+      try Int.fetchOne(db, sql: "SELECT MAX(length(term)) FROM aliases") ?? 0
     }
   }
 
@@ -60,6 +67,8 @@ public actor Library {
       .replacingOccurrences(of: "’", with: "'")
       .replacingOccurrences(of: "‘", with: "'")
       .trimmingCharacters(in: .whitespacesAndNewlines)
+      // macOS compatibility conversion can leave half-width kana voicing marks decomposed.
+      .precomposedStringWithCanonicalMapping
   }
 
   public func search(_ query: String, source: String) throws -> [EntrySummary] {
@@ -95,6 +104,47 @@ public actor Library {
           WHERE length(a.term) BETWEEN ? AND ? AND distance <= ? AND (? = 'All' OR e.source = ?)
           ORDER BY distance, a.term != e.search_key, a.term, e.source, e.id LIMIT 100
           """, arguments: [letters.count - limit, letters.count + limit, limit, source, source])
+    }
+  }
+
+  public func lookup(_ text: String, at offset: Int, source: String) throws -> LookupTerm? {
+    var words: [NSRange] = []
+    text.enumerateSubstrings(in: text.startIndex..., options: .byWords) { _, range, _, _ in
+      words.append(NSRange(range, in: text))
+    }
+    guard let clicked = words.firstIndex(where: { NSLocationInRange(offset, $0) }) else {
+      return nil
+    }
+    let string = text as NSString
+    var candidates: [(term: String, range: NSRange)] = []
+    for start in (0...clicked).reversed() {
+      for end in clicked..<words.count {
+        let range = NSRange(
+          location: words[start].location, length: NSMaxRange(words[end]) - words[start].location)
+        let term = Self.normalized(string.substring(with: range))
+          .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        if term.count > maximumTermLength { break }
+        candidates.append((term, range))
+      }
+      if words[clicked].location - words[start].location > maximumTermLength { break }
+    }
+    return try database.read { db in
+      for candidate in candidates.sorted(by: { $0.range.length > $1.range.length }) {
+        let matchedSource = try String.fetchOne(
+          db,
+          sql: """
+            SELECT e.source FROM aliases a JOIN entries e ON e.id=a.entry_id
+            WHERE a.term=? AND (?='All' OR e.source=? OR
+                (e.source IN ('WISDOM', 'WISDOM_JE') AND ? IN ('WISDOM', 'WISDOM_JE')))
+            ORDER BY e.source != ?, e.source LIMIT 1
+            """, arguments: [candidate.term, source, source, source, source])
+        if let matchedSource {
+          return LookupTerm(
+            term: candidate.term, range: candidate.range,
+            source: source == "All" ? source : matchedSource)
+        }
+      }
+      return nil
     }
   }
 

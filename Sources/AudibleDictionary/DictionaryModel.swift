@@ -7,7 +7,12 @@ final class DictionaryModel: ObservableObject {
   @Published var query = ""
   @Published var source = "All"
   @Published private(set) var dictionaryOrder = ["All", "WISDOM", "WISDOM_JE", "ODE"]
-  @Published var selection: EntrySummary.ID?
+  @Published var selection: EntrySummary.ID? {
+    didSet {
+      if selection != oldValue { anchor = nil }
+    }
+  }
+  @Published private(set) var anchor: String?
   @Published var results: [EntrySummary] = []
   @Published private(set) var isSpellingSuggestion = false
   @Published var entry: Entry?
@@ -17,13 +22,13 @@ final class DictionaryModel: ObservableObject {
   @Published private var history: [Visit] = []
   @Published private var historyIndex = -1
   let audio = AudioPlayer()
-  let audioFolder = Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent(
-    "audio")
+  let audioFolder: URL
 
   private struct Visit: Equatable {
     let query: String
     let source: String
-    let selection: EntrySummary.ID
+    let selection: EntrySummary.ID?
+    let anchor: String?
   }
 
   var canGoBack: Bool { historyIndex > 0 }
@@ -37,9 +42,14 @@ final class DictionaryModel: ObservableObject {
     query = visit.query
     source = visit.source
     selection = visit.selection
+    anchor = visit.anchor
   }
 
-  init() {
+  init(
+    audioFolder: URL = Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent(
+      "audio")
+  ) {
+    self.audioFolder = audioFolder
     if let saved = UserDefaults.standard.stringArray(forKey: "dictionaryOrder") {
       dictionaryOrder.sort {
         (saved.firstIndex(of: $0) ?? saved.count) < (saved.firstIndex(of: $1) ?? saved.count)
@@ -87,6 +97,7 @@ final class DictionaryModel: ObservableObject {
       library = opened
       entry = nil
       selection = nil
+      anchor = nil
       results = []
       isSpellingSuggestion = false
       history = []
@@ -109,52 +120,65 @@ final class DictionaryModel: ObservableObject {
       isSpellingSuggestion =
         !matches.isEmpty && !matches.contains { $0.matchedTerm.hasPrefix(term) }
       if !matches.contains(where: { $0.id == selection }) { selection = matches.first?.id }
-      if entry?.summary.entryID == selection?.entryID { recordVisit() }
+      if selection == nil || entry?.summary.entryID == selection?.entryID { recordVisit() }
       error = nil
     } catch { self.error = error.localizedDescription }
   }
 
   func select() async {
     audio.stop()
-    entry = nil
-    guard let selection, let library else { return }
+    guard let selection, let library else {
+      entry = nil
+      return
+    }
     do {
       let loaded = try await library.entry(selection.entryID)
       if Task.isCancelled || selection != self.selection { return }
       entry = loaded
       if loaded != nil { recordVisit() }
-    } catch { self.error = error.localizedDescription }
+    } catch {
+      entry = nil
+      self.error = error.localizedDescription
+    }
   }
 
   private func recordVisit() {
-    guard let selection else { return }
-    let visit = Visit(query: query, source: source, selection: selection)
+    // Keep empty searches navigable without adding a blank visit at launch.
+    if query.isEmpty && history.isEmpty { return }
+    let visit = Visit(query: query, source: source, selection: selection, anchor: anchor)
     if !history.indices.contains(historyIndex) || history[historyIndex] != visit {
       history = Array(history.prefix(historyIndex + 1)) + [visit]
       historyIndex = history.count - 1
     }
   }
 
-  func follow(_ address: String) {
+  func follow(_ link: DictionaryLink) async {
     guard let entry else { return }
-    let parts = address.components(separatedBy: ":")
-    if parts.count >= 3 && parts[0] == "x-dictionary" && parts[1] == "r" {
-      let sourceID = parts[2].components(separatedBy: "#")[0]
-      Task {
-        do {
-          if let match = try await library?.reference(sourceID, source: entry.summary.source) {
-            // Keep the linked entry selectable while the new query refreshes.
-            if !results.contains(where: { $0.id == match.id }) { results.insert(match, at: 0) }
-            query = match.headword
-            source = match.source
-            selection = match.id
-          } else {
-            error = "That cross-reference is not available in the imported entries."
+    switch link {
+    case .reference(let sourceID, let anchor):
+      do {
+        if let match = try await library?.reference(sourceID, source: entry.summary.source) {
+          if match.entryID == self.entry?.summary.entryID {
+            self.anchor = anchor
+            recordVisit()
+            return
           }
-        } catch { self.error = error.localizedDescription }
-      }
-    } else if parts.count >= 3 && parts[0] == "x-dictionary" && parts[1] == "d" {
-      query = parts[2].removingPercentEncoding ?? parts[2]
+          // Keep the linked entry selectable while the new query refreshes.
+          if !results.contains(where: { $0.id == match.id }) { results.insert(match, at: 0) }
+          query = match.headword
+          source = match.source
+          selection = match.id
+          self.anchor = anchor
+        } else {
+          error = "That cross-reference is not available in the imported entries."
+        }
+      } catch { self.error = error.localizedDescription }
+    case .lookup(let word, let source):
+      anchor = nil
+      self.source = source
+      query = word
+      // A clicked word is a complete query and needs no typing delay.
+      await search()
     }
   }
 
