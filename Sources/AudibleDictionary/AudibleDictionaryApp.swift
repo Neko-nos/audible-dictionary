@@ -23,6 +23,8 @@ struct AudibleDictionaryApp: App {
           .keyboardShortcut("]").disabled(!model.canGoForward)
       }
       CommandMenu("Audio") {
+        Toggle("Edit Audio", isOn: $model.isEditingAudio).keyboardShortcut(
+          "e", modifiers: [.command, .shift])
         Button("Refresh Audio", action: model.refreshAudio)
       }
     }
@@ -46,6 +48,10 @@ struct DictionaryView: View {
           welcome
         } else {
           detail
+        }
+        if model.isEditingAudio {
+          Divider()
+          AudioEditorView(editor: model.editor)
         }
         if let error = model.error {
           HStack {
@@ -89,13 +95,19 @@ struct DictionaryView: View {
           .help("Forward").disabled(!model.canGoForward)
         }
         ToolbarItem(placement: .primaryAction) {
+          Button(model.isEditingAudio ? "Dictionary" : "Edit audio") {
+            model.isEditingAudio.toggle()
+          }
+          .help("Dictionary / Edit audio (⇧⌘E)")
+        }
+        ToolbarItem(placement: .primaryAction) {
           DictionaryTextSizeControl(textSize: $model.textSize)
             // Keep the joined control clear of the search field's focus ring.
             .padding(.trailing, 12)
         }
         ToolbarItem(placement: .primaryAction) {
           DictionarySearchField(query: $model.query)
-            .frame(minWidth: 120, idealWidth: 240, maxWidth: 340)
+            .frame(minWidth: 120, idealWidth: 180, maxWidth: 340)
         }
       }
     }
@@ -104,9 +116,21 @@ struct DictionaryView: View {
       await model.search()
     }
     .task(id: model.selection) { await model.select() }
+    .confirmationDialog(
+      "Save this crop?",
+      isPresented: Binding(
+        get: { model.pendingAudio != nil },
+        set: { if !$0 { model.cancelAudioChange() } }
+      )
+    ) {
+      Button("Save") { model.confirmAudioChange(save: true) }
+      Button("Discard", role: .destructive) { model.confirmAudioChange(save: false) }
+      Button("Cancel", role: .cancel) {}
+    }
     .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) {
       _ in
       audio.stop()
+      model.editor.stop()
     }
   }
 
@@ -157,6 +181,7 @@ struct DictionaryView: View {
         entry: entry, audioFolder: model.audioFolder,
         textSize: model.textSize, selection: model.selection,
         anchor: model.anchor,
+        isEditingAudio: model.isEditingAudio,
         play: model.playExample, playHeadword: model.playHeadword,
         follow: { link in Task { await model.follow(link) } },
         lookup: { text, offset in

@@ -1,3 +1,4 @@
+import AVFoundation
 import DictionaryCore
 import GRDB
 import SwiftUI
@@ -8,6 +9,75 @@ import WebKit
 
 @Suite(.serialized) @MainActor
 struct NavigationTests {
+  @Test func editingAudioWhileReading() async throws {
+    let (model, window) = try makeDictionary()
+    defer {
+      model.editor.stop()
+      window.close()
+    }
+    try await waitUntil { model.entry?.summary.entryID == "dummy_plant" }
+    let webView = try await loadedWebView(in: window)
+    let entry = try #require(model.entry)
+    let example = try #require(entry.examples.first)
+    let folder = model.audioFolder.appendingPathComponent(entry.summary.source)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let original = folder.appendingPathComponent(example.id).appendingPathExtension("caf")
+    let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 24000, channels: 1))
+    let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 48000))
+    buffer.frameLength = buffer.frameCapacity
+    for frame in 0..<48000 {
+      buffer.floatChannelData![0][frame] = Float(sin(Double(frame) * 0.04)) * 0.2
+    }
+    do {
+      let file = try AVAudioFile(forWriting: original, settings: format.settings)
+      try file.write(from: buffer)
+    }
+    try await webView.evaluateJavaScript(
+      "window.scrollTo(0, 1000); document.querySelector('[data-audio-id]').nextElementSibling.click()"
+    )
+    try await waitUntil { model.audio.isPlaying }
+    model.isEditingAudio = true
+    try await waitUntil { model.editor.clip != nil }
+    #expect(!model.audio.isPlaying)
+    #expect(model.editor.recording?.text == example.text)
+    try await waitUntil {
+      try await webView.evaluateJavaScript(
+        "document.querySelector('[data-audio-id]').nextElementSibling.title") as? String
+        == "Crop audio"
+    }
+    #expect(try await webView.evaluateJavaScript("window.scrollY") as? Double == 1000)
+    model.editor.start = 0.25
+    model.editor.end = 1.25
+    model.isEditingAudio = false
+    model.isEditingAudio = true
+    #expect(model.editor.start == 0.25)
+    #expect(model.editor.end == 1.25)
+    model.editor.preview()
+    #expect(model.editor.isPlaying)
+    try await waitUntil { (model.editor.playhead ?? 0) > model.editor.start }
+    try await waitUntil { !model.editor.isPlaying }
+    #expect(model.editor.save())
+    #expect(model.editor.clip?.duration == 1)
+    #expect(!model.editor.hasChanges)
+    #expect(model.editor.canRestore)
+    let saved = try #require(
+      AudioFiles.local(id: example.id, source: entry.summary.source, folder: model.audioFolder))
+    #expect(try AVAudioPlayer(contentsOf: saved).duration == 1)
+    #expect(try AudioCrop(contentsOf: original).duration == 2)
+    model.isEditingAudio = false
+    try await webView.evaluateJavaScript(
+      "document.querySelector('[data-audio-id]').nextElementSibling.click()")
+    try await waitUntil { model.audio.isPlaying }
+    try await waitUntil { !model.audio.isPlaying }
+    model.isEditingAudio = true
+    model.editor.restore()
+    #expect(model.editor.clip?.duration == 2)
+    #expect(!model.editor.canRestore)
+    #expect(
+      AudioFiles.local(id: example.id, source: entry.summary.source, folder: model.audioFolder)
+        == original)
+  }
+
   @Test func bilingualTextLookup() async throws {
     let (model, window) = try makeDictionary()
     defer { window.close() }
