@@ -8,7 +8,7 @@ struct AudibleDictionaryApp: App {
   var body: some Scene {
     Window("Audible Dictionary", id: "dictionary") {
       DictionaryView(model: model, audio: model.audio)
-        .frame(minWidth: 780, minHeight: 520)
+        .frame(minWidth: 780, minHeight: 240)
     }
     .defaultSize(width: 880, height: 620)
     .windowToolbarStyle(.unified)
@@ -41,40 +41,49 @@ struct DictionaryView: View {
         .navigationSplitViewColumnWidth(min: 140, ideal: 175, max: 280)
         .toolbar(removing: .sidebarToggle)
     } detail: {
-      VStack(spacing: 0) {
-        DictionaryTabs(model: model)
-        Divider()
-        if model.library == nil {
-          welcome
-        } else {
-          detail
-        }
-        if model.isEditingAudio {
+      // Keep the editor's height from increasing the split view's minimum height.
+      GeometryReader { _ in
+        VStack(spacing: 0) {
+          DictionaryTabs(model: model)
           Divider()
-          AudioEditorView(editor: model.editor)
-        }
-        if let error = model.error {
-          HStack {
-            Image(systemName: "exclamationmark.circle")
-            Text(error).textSelection(.enabled)
-            Spacer()
-            Button("Dismiss") { model.error = nil }
-          }.font(.callout).padding(10).background(.orange.opacity(0.12))
-        }
-        if audio.status != "Ready" && audio.status != "Stopped" && audio.status != "Finished" {
-          Divider()
-          HStack {
-            if audio.isGenerating {
-              ProgressView().controlSize(.small)
+          Group {
+            if model.library == nil {
+              welcome
             } else {
-              Image(systemName: audio.isPlaying ? "waveform" : "speaker.wave.2")
+              detail
             }
-            Text(audio.status).lineLimit(2)
-            Spacer()
-          }.font(.caption).padding(.horizontal, 16).padding(.vertical, 9)
+          }
+          .frame(minHeight: 0, maxHeight: .infinity)
+          .clipped()
+          if model.isEditingAudio {
+            Divider()
+            AudioEditorView(editor: model.editor)
+              .fixedSize(horizontal: false, vertical: true)
+              .layoutPriority(1)
+          }
+          if let error = model.error {
+            HStack {
+              Image(systemName: "exclamationmark.circle")
+              Text(error).textSelection(.enabled)
+              Spacer()
+              Button("Dismiss") { model.error = nil }
+            }.font(.callout).padding(10).background(.orange.opacity(0.12))
+          }
+          if audio.status != "Ready" && audio.status != "Stopped" && audio.status != "Finished" {
+            Divider()
+            HStack {
+              if audio.isGenerating {
+                ProgressView().controlSize(.small)
+              } else {
+                Image(systemName: audio.isPlaying ? "waveform" : "speaker.wave.2")
+              }
+              Text(audio.status).lineLimit(2)
+              Spacer()
+            }.font(.caption).padding(.horizontal, 16).padding(.vertical, 9)
+          }
         }
+        .background(.background)
       }
-      .background(.background)
       .navigationTitle("Dictionary")
       .navigationSubtitle(
         "\(model.results.count == 100 ? "100+" : "\(model.results.count)") \(model.isSpellingSuggestion ? "suggested" : "found")"

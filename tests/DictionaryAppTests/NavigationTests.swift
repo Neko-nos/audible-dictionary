@@ -213,7 +213,7 @@ struct NavigationTests {
       let editor = try #require(search.currentEditor())
       editor.selectedRange = NSRange(location: 1, length: 1)
     }
-    window.setContentSize(NSSize(width: 820, height: 620))
+    window.setContentSize(NSSize(width: 820, height: 240))
     try await waitUntil { webView.frame.width < width }
     await withCheckedContinuation { continuation in
       DispatchQueue.main.async { continuation.resume() }
