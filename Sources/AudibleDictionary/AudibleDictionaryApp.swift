@@ -8,7 +8,7 @@ struct AudibleDictionaryApp: App {
   var body: some Scene {
     Window("Audible Dictionary", id: "dictionary") {
       DictionaryView(model: model, audio: model.audio)
-        .frame(minWidth: 780, minHeight: 520)
+        .frame(minWidth: 780, minHeight: 240)
     }
     .defaultSize(width: 880, height: 620)
     .windowToolbarStyle(.unified)
@@ -23,6 +23,8 @@ struct AudibleDictionaryApp: App {
           .keyboardShortcut("]").disabled(!model.canGoForward)
       }
       CommandMenu("Audio") {
+        Toggle("Edit Audio", isOn: $model.isEditingAudio).keyboardShortcut(
+          "e", modifiers: [.command, .shift])
         Button("Refresh Audio", action: model.refreshAudio)
       }
     }
@@ -39,36 +41,49 @@ struct DictionaryView: View {
         .navigationSplitViewColumnWidth(min: 140, ideal: 175, max: 280)
         .toolbar(removing: .sidebarToggle)
     } detail: {
-      VStack(spacing: 0) {
-        DictionaryTabs(model: model)
-        Divider()
-        if model.library == nil {
-          welcome
-        } else {
-          detail
-        }
-        if let error = model.error {
-          HStack {
-            Image(systemName: "exclamationmark.circle")
-            Text(error).textSelection(.enabled)
-            Spacer()
-            Button("Dismiss") { model.error = nil }
-          }.font(.callout).padding(10).background(.orange.opacity(0.12))
-        }
-        if audio.status != "Ready" && audio.status != "Stopped" && audio.status != "Finished" {
+      // Keep the editor's height from increasing the split view's minimum height.
+      GeometryReader { _ in
+        VStack(spacing: 0) {
+          DictionaryTabs(model: model)
           Divider()
-          HStack {
-            if audio.isGenerating {
-              ProgressView().controlSize(.small)
+          Group {
+            if model.library == nil {
+              welcome
             } else {
-              Image(systemName: audio.isPlaying ? "waveform" : "speaker.wave.2")
+              detail
             }
-            Text(audio.status).lineLimit(2)
-            Spacer()
-          }.font(.caption).padding(.horizontal, 16).padding(.vertical, 9)
+          }
+          .frame(minHeight: 0, maxHeight: .infinity)
+          .clipped()
+          if model.isEditingAudio {
+            Divider()
+            AudioEditorView(editor: model.editor)
+              .fixedSize(horizontal: false, vertical: true)
+              .layoutPriority(1)
+          }
+          if let error = model.error {
+            HStack {
+              Image(systemName: "exclamationmark.circle")
+              Text(error).textSelection(.enabled)
+              Spacer()
+              Button("Dismiss") { model.error = nil }
+            }.font(.callout).padding(10).background(.orange.opacity(0.12))
+          }
+          if audio.status != "Ready" && audio.status != "Stopped" && audio.status != "Finished" {
+            Divider()
+            HStack {
+              if audio.isGenerating {
+                ProgressView().controlSize(.small)
+              } else {
+                Image(systemName: audio.isPlaying ? "waveform" : "speaker.wave.2")
+              }
+              Text(audio.status).lineLimit(2)
+              Spacer()
+            }.font(.caption).padding(.horizontal, 16).padding(.vertical, 9)
+          }
         }
+        .background(.background)
       }
-      .background(.background)
       .navigationTitle("Dictionary")
       .navigationSubtitle(
         "\(model.results.count == 100 ? "100+" : "\(model.results.count)") \(model.isSpellingSuggestion ? "suggested" : "found")"
@@ -89,13 +104,19 @@ struct DictionaryView: View {
           .help("Forward").disabled(!model.canGoForward)
         }
         ToolbarItem(placement: .primaryAction) {
+          Button(model.isEditingAudio ? "Dictionary" : "Edit audio") {
+            model.isEditingAudio.toggle()
+          }
+          .help("Dictionary / Edit audio (⇧⌘E)")
+        }
+        ToolbarItem(placement: .primaryAction) {
           DictionaryTextSizeControl(textSize: $model.textSize)
             // Keep the joined control clear of the search field's focus ring.
             .padding(.trailing, 12)
         }
         ToolbarItem(placement: .primaryAction) {
           DictionarySearchField(query: $model.query)
-            .frame(minWidth: 120, idealWidth: 240, maxWidth: 340)
+            .frame(minWidth: 120, idealWidth: 180, maxWidth: 340)
         }
       }
     }
@@ -104,9 +125,21 @@ struct DictionaryView: View {
       await model.search()
     }
     .task(id: model.selection) { await model.select() }
+    .confirmationDialog(
+      "Save this crop?",
+      isPresented: Binding(
+        get: { model.pendingAudio != nil },
+        set: { if !$0 { model.cancelAudioChange() } }
+      )
+    ) {
+      Button("Save") { model.confirmAudioChange(save: true) }
+      Button("Discard", role: .destructive) { model.confirmAudioChange(save: false) }
+      Button("Cancel", role: .cancel) {}
+    }
     .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) {
       _ in
       audio.stop()
+      model.editor.stop()
     }
   }
 
@@ -157,6 +190,7 @@ struct DictionaryView: View {
         entry: entry, audioFolder: model.audioFolder,
         textSize: model.textSize, selection: model.selection,
         anchor: model.anchor,
+        isEditingAudio: model.isEditingAudio,
         play: model.playExample, playHeadword: model.playHeadword,
         follow: { link in Task { await model.follow(link) } },
         lookup: { text, offset in

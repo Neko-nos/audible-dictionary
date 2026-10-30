@@ -22,6 +22,18 @@ final class DictionaryModel: ObservableObject {
   @Published private var history: [Visit] = []
   @Published private var historyIndex = -1
   let audio = AudioPlayer()
+  let editor = AudioEditor()
+  @Published var isEditingAudio = false {
+    didSet {
+      audio.stop()
+      editor.stop()
+      if isEditingAudio, let selectedAudio {
+        edit(selectedAudio)
+      }
+    }
+  }
+  @Published var pendingAudio: AudioRecording?
+  private var selectedAudio: AudioRecording?
   let audioFolder: URL
 
   private struct Visit: Equatable {
@@ -94,6 +106,7 @@ final class DictionaryModel: ObservableObject {
     do {
       let opened = try Library(folder: url)
       audio.stop()
+      editor.stop()
       library = opened
       entry = nil
       selection = nil
@@ -127,6 +140,7 @@ final class DictionaryModel: ObservableObject {
 
   func select() async {
     audio.stop()
+    editor.stop()
     guard let selection, let library else {
       entry = nil
       return
@@ -186,14 +200,48 @@ final class DictionaryModel: ObservableObject {
     guard let entry, let example = entry.examples.first(where: { $0.id == id }) else {
       return
     }
-    audio.play(
-      id: example.id, source: entry.summary.source, folder: audioFolder, text: example.text)
+    play(
+      AudioRecording(
+        id: example.id, source: entry.summary.source, accent: nil, text: example.text))
   }
 
   func playHeadword(_ accent: Accent) {
     guard let entry, let audioID = entry.summary.audioID else { return }
-    audio.play(
-      id: audioID, source: entry.summary.source, accent: accent,
-      folder: audioFolder, text: entry.summary.headword)
+    play(
+      AudioRecording(
+        id: audioID, source: entry.summary.source, accent: accent,
+        text: entry.summary.headword))
+  }
+
+  private func play(_ recording: AudioRecording) {
+    selectedAudio = recording
+    if isEditingAudio {
+      edit(recording)
+    } else {
+      audio.play(
+        id: recording.id, source: recording.source, accent: recording.accent,
+        folder: audioFolder, text: recording.text)
+    }
+  }
+
+  private func edit(_ recording: AudioRecording) {
+    editor.stop()
+    if editor.hasChanges && editor.recording != recording {
+      pendingAudio = recording
+    } else {
+      editor.load(recording, folder: audioFolder)
+    }
+  }
+
+  func confirmAudioChange(save: Bool) {
+    guard let pendingAudio else { return }
+    if save && !editor.save() { return }
+    editor.load(pendingAudio, folder: audioFolder)
+    self.pendingAudio = nil
+  }
+
+  func cancelAudioChange() {
+    pendingAudio = nil
+    selectedAudio = editor.recording
   }
 }

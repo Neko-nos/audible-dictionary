@@ -8,6 +8,7 @@ struct EntryWebView: NSViewRepresentable {
   let textSize: Double
   let selection: EntrySummary.ID?
   let anchor: String?
+  let isEditingAudio: Bool
   let play: (String) -> Void
   let playHeadword: (Accent) -> Void
   let follow: (DictionaryLink) -> Void
@@ -46,6 +47,10 @@ struct EntryWebView: NSViewRepresentable {
     }.map(\.id)
     let imported = String(data: try! JSONEncoder().encode(localIDs), encoding: .utf8)!
     if context.coordinator.selection == selection {
+      if context.coordinator.isEditingAudio != isEditingAudio {
+        context.coordinator.isEditingAudio = isEditingAudio
+        view.evaluateJavaScript("updateAudioMode(\(isEditingAudio))")
+      }
       if context.coordinator.localIDs != localIDs {
         context.coordinator.localIDs = localIDs
         view.evaluateJavaScript("updateAudioAvailability(\(imported))")
@@ -59,6 +64,7 @@ struct EntryWebView: NSViewRepresentable {
     context.coordinator.selection = selection
     context.coordinator.anchor = anchor
     context.coordinator.localIDs = localIDs
+    context.coordinator.isEditingAudio = isEditingAudio
     let reviewIDs = String(
       data: try! JSONEncoder().encode(entry.examples.filter(\.needsReview).map(\.id)),
       encoding: .utf8)!
@@ -84,6 +90,8 @@ struct EntryWebView: NSViewRepresentable {
       [data-d-pr="US"] { display: none; }
       </style></head><body>\(entry.html)
       <script>
+      let editingAudio = \(isEditingAudio);
+      let availableAudio = \(imported);
       const review = new Set(\(reviewIDs));
       const match = \(match);
       if (match && match !== \(headword)) {
@@ -101,6 +109,7 @@ struct EntryWebView: NSViewRepresentable {
         ['us', 'uk'].forEach(accent => {
           const button = document.createElement('button');
           button.className = 'audio-button';
+          button.dataset.accent = accent;
           button.textContent = '▶ ' + accent.toUpperCase();
           button.title = 'Play ' + accent.toUpperCase() + ' headword pronunciation';
           button.setAttribute('aria-label', button.title);
@@ -118,15 +127,28 @@ struct EntryWebView: NSViewRepresentable {
         example.after(button);
       });
       function updateAudioAvailability(ids) {
+        availableAudio = ids;
         const imported = new Set(ids);
         document.querySelectorAll('[data-audio-id]').forEach(example => {
           const button = example.nextElementSibling;
-          button.title = (imported.has(example.dataset.audioId) ? 'Play audio' : 'Generate and play speech') +
+          button.textContent = editingAudio ? '✂' : '▶';
+          button.title = (editingAudio ? 'Crop audio' :
+            imported.has(example.dataset.audioId) ? 'Play audio' : 'Generate and play speech') +
             (review.has(example.dataset.audioId) ? ' · Example contains editorial alternatives' : '');
           button.setAttribute('aria-label', button.title + ': ' + example.textContent);
         });
       }
-      updateAudioAvailability(\(imported));
+      function updateAudioMode(editing) {
+        editingAudio = editing;
+        document.querySelectorAll('[data-accent]').forEach(button => {
+          const accent = button.dataset.accent.toUpperCase();
+          button.textContent = (editing ? '✂ ' : '▶ ') + accent;
+          button.title = (editing ? 'Crop ' : 'Play ') + accent + ' headword pronunciation';
+          button.setAttribute('aria-label', button.title);
+        });
+        updateAudioAvailability(availableAudio);
+      }
+      updateAudioMode(editingAudio);
       (() => {
         let hover = null;
         let version = 0;
@@ -238,6 +260,7 @@ struct EntryWebView: NSViewRepresentable {
     var selection: EntrySummary.ID?
     var anchor: String?
     var localIDs: [String] = []
+    var isEditingAudio = false
     var play: (String) -> Void
     var playHeadword: (Accent) -> Void
     var follow: (DictionaryLink) -> Void
